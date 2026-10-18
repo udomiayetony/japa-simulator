@@ -2,7 +2,7 @@
 
 **Product:** London Hustle
 **Owner:** Tony Udomiaye
-**Status:** Phase 1 complete · Phase 2 in build (Supabase) · Phase 3 planned · Phase 4 approved (18 Oct 2026)
+**Status:** Phase 1 complete · Better than Lagos Life batch built (18 Oct 2026) · Phase 2 in build (Supabase) · Phase 3 planned · Phase 4 approved (18 Oct 2026)
 **Last updated:** 18 October 2026
 
 ---
@@ -57,8 +57,9 @@ A scan of lagoslife.app (public pages, Terms, Privacy Policy, public API respons
    - **Old Money:** Chelsea flat and an allowance until Pater cuts them off on day 15. Goal: £12,000 net worth.
    - **New Gen:** Peckham council flat with £2,000 of high-interest debt. Goal: clear the debt and save £2,500.
 4. The player picks **where they are from**, by flag: the country they moved from (Fresh Immigrant) or their family roots (Old Money and New Gen, UK by default). The flag shows next to their name, on the ending card and in the share text, and the "fly home" trip and family calls use it.
-5. The player taps buildings to travel (Tube, bus, bike, walk, cab), takes actions, gets jobs and makes friends.
-6. The game ends at day 60, or earlier through deportation or eviction, with a grade and a shareable result.
+5. A 60-second **guided start** walks them through their first play: tap a place, pick how to get there, eat something, apply for a job. They can skip it at any time.
+6. The player taps buildings to travel (Tube, bus, bike, walk, cab), takes actions, gets jobs and makes friends. The 🎯 goal tracker always shows the next step, and the 💡 button sells hints.
+7. The game ends at day 60, or earlier through deportation or eviction, with a grade and a shareable result.
 
 ### 5.2 Core loop
 Check needs → choose a place → travel (time and money) → take an action (time, money, needs, skills) → random London events → weekly bills on Monday.
@@ -114,11 +115,50 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 
 Known limits to fix before Phase 4 money flows: the in-game economy is still client-side (a determined player could edit their own save), so property prices and rent are game money only. Phase 4 earnings are based on reach and campaigns, not in-game money, but anything that pays out real money must be calculated on the server.
 
+### Better than Lagos Life (approved and built, 18 Oct 2026)
+
+Approved by Tony on 18 Oct 2026: A1–A3, B1–B3, C1–C3 and D1–D6. Not approved, so not built: A4–A6, B4–B11 and C4–C8.
+
+**A. Hints that cost money**
+
+| ID | Requirement | Status |
+|---|---|---|
+| A1 | A 💡 "Next step" button suggests the best next move for the player's situation: their needs, visa clock, job, debt, rent day and goal. | Built |
+| A2 | Hints cost in-game money, and the fee is shown before the player pays: **basic £5** (one line), **detailed £20** (where to go, how to get there and why), **money tip 5% of cash, capped at £200** (minimum £2). | Built |
+| A3 | Hints are free for the first 2 game days. The help screen and the goal tracker are always free. | Built |
+
+**B. Easy to start, hard to put down**
+
+| ID | Requirement | Status |
+|---|---|---|
+| B1 | A 60-second guided start instead of a wall of help text: tap a place → pick how to travel → eat → apply for a job. Each step highlights what to tap; Skip is always there. | Built |
+| B2 | A goal tracker always on screen, for example "🎯 Next: Get a job that sponsors visas (step 2 of 4)". Four steps per life; tapping it opens hints. | Built |
+| B3 | A daily login reward with a streak (one per real day): £20, 3 meals, £40, coffee and croissant, £60, £80, and on day 7 a rare outfit colour that can't be picked anywhere else. Streaks are kept in the browser and in the cloud save. Outfits are changed in Me → Wardrobe. | Built |
+
+**C. A London you can recognise**
+
+| ID | Requirement | Status |
+|---|---|---|
+| C1 | Visible trains on their own tracks in line colours: Tube lines (Central red, Jubilee grey, and so on), Overground, Elizabeth line and rail, and the DLR on a raised viaduct. When the player takes the Tube, they ride a train in the line's colour along the real route, changing colour at each change of line. Buses and cabs are shown the same way. | Built |
+| C2 | An Underground entrance at every place, in our own design (a navy sign with a mint stripe and the station name), **not** the TfL roundel, which is a registered trade mark. Plus the nine mainline termini at their real positions: Paddington, Euston, St Pancras, Liverpool Street, Waterloo, Victoria, London Bridge, Marylebone and Charing Cross. | Built |
+| C3 | Thames bridges at their real positions, spanning the river at right angles: Hammersmith, Battersea, Albert, Chelsea, Vauxhall, Lambeth, Westminster, Waterloo, Blackfriars, Southwark and London Bridge, in arch, beam or suspension styles and their real colours. Roads and railways that cross the river now go over bridges, and traffic rises over them. | Built |
+
+**D. Depth and polish**
+
+| ID | Requirement | Status |
+|---|---|---|
+| D1 | Walking characters: the player walks the streets with swinging arms and legs (no more hopping), Londoners walk the pavements and parks, and other live players walk across the map to where they go. | Built |
+| D2 | A home to decorate: a 3D room you furnish and paint (12 pieces of furniture, 7 wall colours). Furniture adds comfort, which improves sleep and home time; the sofa unlocks "Have friends round", the desk unlocks "Study coding at home", the bed gives more energy and the telly is more fun. First version of the Phase 3 housing item. | Built (first version) |
+| D3 | Weather events with gameplay effects, by season: snow days (Dec–Feb: buses slower, no cycling, snowmen and snowball fights, delivery riders earn 30% more), heatwaves (Jun–Aug: the Tube is a sauna, ice creams), Thames fog (Oct–Mar: the Woolwich Ferry stops, cabs crawl). Each is visible in the 3D city: falling snow and white parks, thick fog, warm light. | Built |
+| D4 | A real London calendar. The game starts on the real date you start playing and follows the calendar: London Marathon, Pride, Notting Hill Carnival (August bank holiday weekend), Halloween, Bonfire Night fireworks over Battersea Park, Christmas lights on Oxford Street (with the Trafalgar Square tree), Winter Wonderland, Christmas Day (no Tube or buses), Boxing Day sales and New Year's Eve fireworks over the Thames. Each event has an announcement, something to do at its place and 3D visuals. | Built |
+| D5 | Speed: the city appears fast, then adds detail as you play. The core city (river, parks, roads, the 24 places) draws first; landmarks, stations, bridges, railways, filler buildings, traffic, trains and people stream in over the next frames; glow and shading switch on once everything has loaded. Game scripts download in parallel and Supabase no longer delays the start. Measured with software rendering (no graphics chip): title in under 1 second, first 3D frame in 2.0–2.5 seconds on a phone-sized screen. | Built |
+| D6 | Accessibility: a Bigger text option, colour-blind-safe need rings and bars (blue and orange with a "!" when low), full keyboard play (arrows or WASD to move the map, + and - to zoom, P for a list of places, 1–9 for actions, H for hints, M for the menu, Esc to close), visible focus outlines, screen-reader labels on the need rings, and reduced motion when the device asks for it. | Built |
+
 ### Phase 3: Deeper life sim
 
 | ID | Requirement | Priority |
 |---|---|---|
-| D1 | Housing tiers (house share room → studio → one-bed → house) with furniture and a build mode. | P1 |
+| D1 | Housing tiers (house share room → studio → one-bed → house) with furniture and a build mode. (Furniture and decorating are now built; tiers and moving home are not.) | P1 |
 | D2 | Action queue: tap objects and the character walks there and does them in order. | P1 |
 | D3 | Phone with apps: Jobs, Bank, Invest, Dating, Maps. | P1 |
 | D4 | Dating, relationships and marriage; children and school. | P2 |
@@ -189,7 +229,7 @@ Splits apply to net revenue, after payment processing fees (roughly 2–3%). Bra
 
 - **Phase 1:** static HTML/CSS/JS with Three.js 0.169 (ES modules from jsDelivr, loaded through an import map) and its post-processing add-ons. No build step. Hosted on GitHub Pages or Vercel. Saves in `localStorage`.
 - **Phase 2:** add a backend, for example Supabase (Postgres, auth, realtime) or Firebase. Websocket presence for live players, row-level security on all player data, rate limiting and moderation for chat.
-- **Performance:** shared geometries and cached materials, instancing for trees and filler buildings, capped device pixel ratio, and a graphics setting that turns off ambient occlusion and shadows on weaker devices.
+- **Performance:** shared geometries and cached materials, instancing for trees, filler buildings and walking Londoners, capped device pixel ratio, a graphics setting that turns off ambient occlusion and shadows on weaker devices, and a staged world build so the first frame appears before the detail.
 - **Phase 4:** payments and payouts through Stripe Connect (identity checks, payouts, tax reporting data); ad artwork stored and served by our own backend; an admin review queue.
 
 ## 9. Success metrics

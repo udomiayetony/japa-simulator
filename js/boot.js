@@ -11,21 +11,20 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 window.THREE = { ...THREE_NS };
 window.FX = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, OutputPass, RoomEnvironment };
 
-// Supabase powers Live London. If it cannot load, the game still plays offline.
-try {
-  window.SupabaseLib = await import('@supabase/supabase-js');
-} catch (e) {
-  console.warn('Live London unavailable, playing offline.', e);
-}
+// Supabase powers Live London. It loads alongside the game instead of before it, so the
+// city appears straight away; Online.init waits for it. Offline play works without it.
+window.SupabaseReady = import('@supabase/supabase-js')
+  .then((m) => { window.SupabaseLib = m; })
+  .catch((e) => console.warn('Live London unavailable, playing offline.', e));
 
-const SCRIPTS = ['js/config.js', 'js/data.js', 'js/avatar.js', 'js/online.js', 'js/game.js', 'js/live-ui.js', 'js/world.js'];
-for (const src of SCRIPTS) {
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = () => reject(new Error(`Could not load ${src}`));
-    document.body.appendChild(s);
-  });
-}
+// Fetch every game script at once but run them in order.
+const SCRIPTS = ['js/config.js', 'js/data.js', 'js/avatar.js', 'js/online.js', 'js/game.js', 'js/coach.js', 'js/home.js', 'js/live-ui.js', 'js/world.js'];
+await Promise.all(SCRIPTS.map((src) => new Promise((resolve, reject) => {
+  const s = document.createElement('script');
+  s.src = src;
+  s.async = false;
+  s.onload = resolve;
+  s.onerror = () => reject(new Error(`Could not load ${src}`));
+  document.body.appendChild(s);
+})));
 window.startLondonHustle();

@@ -49,6 +49,7 @@ const Online = (() => {
 
   async function init() {
     const cfg = window.LH_CONFIG || {};
+    if (window.SupabaseReady) await window.SupabaseReady;
     if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || !window.SupabaseLib) { readyResolve(); return; }
     try {
       sb = window.SupabaseLib.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {

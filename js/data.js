@@ -197,11 +197,110 @@ const TUBE_INCIDENTS = [
   { text: 'Lost your Oyster card. Had to tap your bank card like everyone else.', fun: -2 },
 ];
 
+// months: the months (0 = January) a weather type can happen in. No list means all year.
 const WEATHER = [
-  { id: 'rain',  label: 'Drizzle',  icon: '🌧️', w: 40 },
-  { id: 'grey',  label: 'Grey',     icon: '☁️', w: 30 },
-  { id: 'sun',   label: 'Sunny',    icon: '☀️', w: 22 },
-  { id: 'heat',  label: 'Heatwave', icon: '🥵', w: 8 },
+  { id: 'rain',  label: 'Drizzle',    icon: '🌧️', w: 40 },
+  { id: 'grey',  label: 'Grey',       icon: '☁️', w: 30 },
+  { id: 'sun',   label: 'Sunny',      icon: '☀️', w: 22 },
+  { id: 'heat',  label: 'Heatwave',   icon: '🥵', w: 14, months: [5, 6, 7] },
+  { id: 'snow',  label: 'Snow day',   icon: '❄️', w: 10, months: [11, 0, 1] },
+  { id: 'fog',   label: 'Thames fog', icon: '🌫️', w: 9, months: [9, 10, 11, 0, 1, 2] },
 ];
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// ---------------------------------------------------------------- the London calendar
+// Dates follow the real calendar. The game starts on the day you start playing.
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// The nth given weekday (0 = Sunday) of a month; n = -1 means the last one.
+function nthWeekday(y, m, wd, n) {
+  if (n < 0) {
+    const d = new Date(y, m + 1, 0);
+    d.setDate(d.getDate() - ((d.getDay() - wd + 7) % 7));
+    return d;
+  }
+  const d = new Date(y, m, 1);
+  d.setDate(1 + ((wd - d.getDay() + 7) % 7) + (n - 1) * 7);
+  return d;
+}
+
+// on(year) gives the first day; len is how many days it runs. visual is drawn in the 3D city.
+// action is what you can do at `place` while it is on: hours [from, to) and its effects.
+const CALENDAR = [
+  { id: 'marathon', name: 'London Marathon', icon: '🏃', place: 'westminster', len: 1,
+    on: (y) => nthWeekday(y, 3, 0, -1),
+    text: '40,000 runners are pounding the streets from Greenwich to The Mall. Some are dressed as Big Ben.',
+    action: { label: '📣 Cheer on the Marathon', mins: 120, hours: [9, 15], fx: { fun: 18, social: 10 } } },
+  { id: 'pride', name: 'Pride in London', icon: '🏳️‍🌈', place: 'soho', len: 1, visual: 'pride',
+    on: (y) => nthWeekday(y, 6, 6, 1),
+    text: 'A million people, a parade from Hyde Park Corner to Whitehall and glitter in places glitter should not be.',
+    action: { label: '🏳️‍🌈 Join the Pride parade', mins: 240, hours: [11, 20], fx: { fun: 40, social: 30, energy: -12 } } },
+  { id: 'carnival', name: 'Notting Hill Carnival', icon: '🎊', place: 'nottinghill', len: 2, visual: 'carnival',
+    on: (y) => { const d = nthWeekday(y, 7, 1, -1); d.setDate(d.getDate() - 1); return d; },
+    text: 'Steel drums, sound systems, jerk chicken and two million people. Europe\'s biggest street party is on.',
+    action: { label: '🎊 Dance at Carnival', mins: 300, cost: 25, hours: [10, 21], fx: { fun: 45, social: 30, hunger: 30, energy: -20 } } },
+  { id: 'halloween', name: 'Halloween', icon: '🎃', place: 'camden', len: 1,
+    on: (y) => new Date(y, 9, 31),
+    text: 'Camden has gone full horror film. The goths say it is just a normal Friday for them.',
+    action: { label: '🎃 Halloween night out', mins: 240, cost: 15, hours: [19, 24], fx: { fun: 35, social: 25, energy: -12 } } },
+  { id: 'bonfire', name: 'Bonfire Night', icon: '🎆', place: 'battersea', len: 1, visual: 'fireworks', fireworksAt: 'battersea',
+    on: (y) => new Date(y, 10, 5),
+    text: 'Remember, remember the fifth of November. Fireworks over Battersea Park tonight.',
+    action: { label: '🎆 Fireworks in Battersea Park', mins: 150, cost: 12, hours: [18, 23], fx: { fun: 35, social: 15 } } },
+  { id: 'xmaslights', name: 'Christmas lights on Oxford Street', icon: '🎄', place: 'oxford', len: 62, visual: 'xmas',
+    on: (y) => nthWeekday(y, 10, 4, 1),
+    text: 'The Christmas lights are switched on along Oxford Street. Tourists are walking even slower now.',
+    action: { label: '🎄 See the Christmas lights', mins: 60, hours: [16, 23], fx: { fun: 14, social: 4 } } },
+  { id: 'wonderland', name: 'Winter Wonderland', icon: '🎡', place: 'hydepark', len: 44, visual: 'wonderland',
+    on: (y) => new Date(y, 10, 20),
+    text: 'Winter Wonderland opens in Hyde Park: ice rink, mulled wine and a big wheel.',
+    action: { label: '⛸️ Winter Wonderland', mins: 180, cost: 22, hours: [10, 22], fx: { fun: 32, social: 12, hunger: 15 } } },
+  { id: 'christmas', name: 'Christmas Day', icon: '🎁', place: null, len: 1,
+    on: (y) => new Date(y, 11, 25),
+    text: 'No Tube, no buses, everything shut. London is silent apart from the sound of the Queen\'s, sorry, King\'s Speech.' },
+  { id: 'boxing', name: 'Boxing Day sales', icon: '🛍️', place: 'oxford', len: 1,
+    on: (y) => new Date(y, 11, 26),
+    text: 'The Boxing Day sales are on. People queued outside Selfridges from 5am.',
+    action: { label: '🛍️ Fight through the sales', mins: 180, cost: 40, hours: [8, 20], fx: { fun: 18, charm: 2, energy: -10 } } },
+  { id: 'nye', name: 'New Year\'s Eve on the Thames', icon: '🎆', place: 'southbank', len: 1, visual: 'fireworks', fireworksAt: 'southbank',
+    on: (y) => new Date(y, 11, 31),
+    text: 'Big Ben, the London Eye and 12 minutes of fireworks over the Thames at midnight.',
+    action: { label: '🎆 New Year fireworks on the Embankment', mins: 180, cost: 15, hours: [20, 24], fx: { fun: 50, social: 30, energy: -15 } } },
+];
+
+// Furniture for your home. comfort makes sleep and home time better.
+const FURNITURE = {
+  rug:       { name: 'Rug', icon: '🟫', price: 35, comfort: 3 },
+  plant:     { name: 'Plant', icon: '🪴', price: 15, comfort: 3 },
+  lamp:      { name: 'Floor lamp', icon: '💡', price: 30, comfort: 3 },
+  poster:    { name: 'Poster', icon: '🖼️', price: 12, comfort: 2 },
+  flag:      { name: 'Your flag', icon: '🏳️', price: 8, comfort: 2 },
+  lights:    { name: 'Fairy lights', icon: '✨', price: 14, comfort: 2 },
+  bookshelf: { name: 'Bookshelf', icon: '📚', price: 70, comfort: 3 },
+  speaker:   { name: 'Speaker', icon: '🔊', price: 90, comfort: 3, perk: 'Music makes telly and home time more fun' },
+  sofa:      { name: 'Sofa', icon: '🛋️', price: 180, comfort: 8, perk: 'Unlocks "Have friends round"' },
+  tv:        { name: 'Big telly', icon: '📺', price: 220, comfort: 4, perk: 'Telly is more fun' },
+  desk:      { name: 'Desk and laptop', icon: '💻', price: 260, comfort: 2, perk: 'Unlocks "Study coding at home"' },
+  bed:       { name: 'Memory-foam bed', icon: '🛏️', price: 300, comfort: 6, perk: 'Sleep gives more energy' },
+};
+const WALL_COLOURS = ['#efe4cf', '#cfe3d4', '#d4e1f2', '#f2d4cf', '#e3d9f2', '#f6e7a8', '#2f3e46'];
+const START_FURNITURE = {
+  immigrant: [],
+  oldmoney: ['sofa', 'bed', 'lamp', 'rug', 'tv', 'bookshelf', 'plant'],
+  newgen: ['tv', 'poster'],
+};
+
+// Daily login rewards. Day 7 of a streak unlocks an outfit colour you can't pick anywhere else.
+const BASE_OUTFITS = OUTFITS.length;
+const REWARD_OUTFITS = [['#d4af37', 'Gold'], ['#00a19a', 'Teal sequin'], ['#5b2a86', 'Royal purple'], ['#ff2e88', 'Hot pink'], ['#c0c6cc', 'Silver'], ['#d9601a', 'Burnt orange'], ['#191970', 'Midnight']];
+OUTFITS.push(...REWARD_OUTFITS.map(([c]) => c));
+const DAILY_REWARDS = [
+  { icon: '💷', label: '£20', money: 20 },
+  { icon: '🥫', label: '3 free meals', meals: 3 },
+  { icon: '💷', label: '£40', money: 40 },
+  { icon: '☕', label: 'Coffee and croissant', needs: { energy: 25, fun: 10 } },
+  { icon: '💷', label: '£60', money: 60 },
+  { icon: '💷', label: '£80', money: 80 },
+  { icon: '👕', label: 'Free outfit', outfit: true },
+];

@@ -22,7 +22,22 @@ function money(n) {
 
 const day = () => Math.floor(S.t / 1440) + 1;
 const hour = () => Math.floor((S.t % 1440) / 60);
-const dow = () => (day() - 1) % 7; // 0 = Monday
+
+// The game follows the real calendar: day 1 is the date you started playing.
+function isoDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function parseISO(str) { const [y, m, d] = str.split('-').map(Number); return new Date(y, m - 1, d); }
+function gameDate(dd = day()) { const d = parseISO(S.start); d.setDate(d.getDate() + dd - 1); return d; }
+const dow = () => (gameDate().getDay() + 6) % 7; // 0 = Monday
+function dateLabel(d = gameDate()) { return `${DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS[d.getMonth()]}`; }
+// London calendar events running on a date (see CALENDAR in data.js).
+function eventsOn(d = gameDate()) {
+  return CALENDAR.filter((ev) => [d.getFullYear(), d.getFullYear() - 1].some((y) => {
+    const diff = Math.round((d - ev.on(y)) / 86400000);
+    return diff >= 0 && diff < ev.len;
+  }));
+}
+function eventStartsOn(ev, d = gameDate()) { return Math.round((d - ev.on(d.getFullYear())) / 86400000) === 0; }
+const eventOn = (id) => eventsOn().some((ev) => ev.id === id);
 const isWeekend = () => dow() >= 5;
 function clock() {
   const m = S.t % 1440;
@@ -58,9 +73,11 @@ function advance(mins, opts = {}) {
 }
 
 function rollWeather() {
-  const total = WEATHER.reduce((a, w) => a + w.w, 0);
+  const m = gameDate().getMonth();
+  const pool = WEATHER.filter((w) => !w.months || w.months.includes(m));
+  const total = pool.reduce((a, w) => a + w.w, 0);
   let r = Math.random() * total;
-  for (const w of WEATHER) { r -= w.w; if (r <= 0) return w.id; }
+  for (const w of pool) { r -= w.w; if (r <= 0) return w.id; }
   return 'grey';
 }
 
@@ -83,12 +100,15 @@ function newDay() {
   }[S.bg];
   log(`📰 The Evening Hustle: ${HEADLINES[(d * 7) % HEADLINES.length]}`);
   if (d % 3 === 0) log(TIPS[(d / 3) % TIPS.length]);
+  for (const ev of eventsOn()) if (eventStartsOn(ev)) S.queue.push({ cal: ev.id });
   if (scripted[d]) S.queue.push(scripted[d]);
   else if (d > 2 && chance(0.45)) {
     const ev = randomEvent();
     if (ev) S.queue.push(ev);
   }
   if (S.weather === 'heat' && chance(0.6)) S.queue.push('heatwave');
+  if (S.weather === 'snow' && chance(0.7)) S.queue.push('snowDay');
+  if (S.weather === 'fog' && chance(0.6)) S.queue.push('fogDay');
 }
 
 function weekly() {
@@ -199,6 +219,33 @@ function hops(a, b) {
 }
 const dist = (a, b) => Math.hypot(LOCATIONS[a].x - LOCATIONS[b].x, LOCATIONS[a].y - LOCATIONS[b].y);
 
+// Shortest list of stops from a to b on the network.
+function route(a, b) {
+  if (a === b) return [a];
+  const prev = { [a]: null };
+  const q = [a];
+  while (q.length) {
+    const s = q.shift();
+    for (const t of ADJ[s] || []) {
+      if (t in prev) continue;
+      prev[t] = s;
+      if (t === b) { const path = [b]; let c = s; while (c) { path.unshift(c); c = prev[c]; } return path; }
+      q.push(t);
+    }
+  }
+  return [a, b];
+}
+// The colour of the line you ride between each pair of stops (Tube lines first).
+function routeColours(path) {
+  const out = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const on = LINES.filter((l) => l.stops.some((s, k) => (s === path[i] && l.stops[k + 1] === path[i + 1]) || (s === path[i + 1] && l.stops[k + 1] === path[i])));
+    const line = on.find((l) => !l.rail) || on[0];
+    out.push(line ? line.colour : '#dc241f');
+  }
+  return out;
+}
+
 function travelOptions(to) {
   const from = S.loc;
   const d = dist(from, to);
@@ -213,29 +260,32 @@ function travelOptions(to) {
   if (from === 'heathrow' || to === 'heathrow') fare += 1.6;
   const cap = 8.9 + 1.6 * Math.max(0, zmax - 2);
   const tubeCost = round2(Math.max(0, Math.min(fare, cap - S.fares.tube)));
+  const w = S.weather;
+  const xmas = eventOn('christmas') ? 'No Tube or buses on Christmas Day' : null;
   opts.push({
     mode: 'tube', label: '🚇 Tube', mins: Math.round(6 + h * 7), cost: tubeCost,
-    note: (isPeak() ? 'Peak fare' : 'Off-peak') + (tubeCost < round2(fare) ? ', daily cap hit' : ''),
-    disabled: S.strike ? 'RMT strike: no Tube today' : !tubeOpen() ? 'Closed. Night Tube runs Fri & Sat only' : null,
+    note: (isPeak() ? 'Peak fare' : 'Off-peak') + (tubeCost < round2(fare) ? ', daily cap hit' : '') + (w === 'heat' ? ', like a sauna' : ''),
+    disabled: xmas || (S.strike ? 'RMT strike: no Tube today' : !tubeOpen() ? 'Closed. Night Tube runs Fri & Sat only' : null),
   });
   opts.push({
-    mode: 'bus', label: '🚌 Bus', mins: Math.round(15 + d * 0.17), cost: round2(Math.max(0, Math.min(1.75 * fareCut, 5.25 - S.fares.bus))),
-    note: S.strike ? 'Rammed because of the strike' : 'Hopper fare',
+    mode: 'bus', label: '🚌 Bus', mins: Math.round((15 + d * 0.17) * (w === 'snow' ? 1.5 : 1)), cost: round2(Math.max(0, Math.min(1.75 * fareCut, 5.25 - S.fares.bus))),
+    note: w === 'snow' ? 'Crawling through the snow' : S.strike ? 'Rammed because of the strike' : 'Hopper fare',
+    disabled: xmas,
   });
   const cycleMins = Math.round(5 + d * 0.09);
   opts.push({
     mode: 'cycle', label: '🚲 Santa Cycle', mins: cycleMins, cost: round2(1.65 * Math.ceil(cycleMins / 30)),
-    note: S.weather === 'rain' ? 'In the rain, brave' : 'Hire bike',
-    disabled: d > 480 ? 'Too far to cycle' : null,
+    note: w === 'rain' ? 'In the rain, brave' : 'Hire bike',
+    disabled: w === 'snow' ? 'Too icy to cycle today' : d > 480 ? 'Too far to cycle' : null,
   });
   opts.push({
-    mode: 'walk', label: '🚶 Walk', mins: Math.round(d * 0.28), cost: 0,
-    note: d > 260 ? 'A very long, very free walk' : 'Free, but tiring',
+    mode: 'walk', label: '🚶 Walk', mins: Math.round(d * 0.28 * (w === 'snow' ? 1.3 : 1)), cost: 0,
+    note: w === 'snow' ? 'Slippery, take it slow' : d > 260 ? 'A very long, very free walk' : 'Free, but tiring',
   });
   const late = hour() >= 23 || hour() < 5;
   opts.push({
-    mode: 'cab', label: '🚕 Ubah', mins: Math.round(8 + d * 0.11), cost: Math.round((8 + d * 0.05) * (late ? 1.6 : 1)) + (Online.policy() === 'clean_air' ? 3 : 0),
-    note: late ? 'Late-night surge' : 'Door to door',
+    mode: 'cab', label: '🚕 Ubah', mins: Math.round((8 + d * 0.11) * (w === 'fog' || w === 'snow' ? 1.3 : 1)), cost: Math.round((8 + d * 0.05) * (late || xmas ? 1.6 : 1)) + (Online.policy() === 'clean_air' ? 3 : 0),
+    note: w === 'fog' ? 'Crawling through the fog' : late ? 'Late-night surge' : xmas ? 'Christmas Day prices' : 'Door to door',
   });
   for (const o of opts) if (!o.disabled && o.cost > S.money) o.disabled = 'Not enough money';
   return opts;
@@ -259,6 +309,7 @@ function travel(to, mode) {
     extra = ' ' + inc.text + fx({ fun: inc.fun, energy: inc.energy, hygiene: inc.hygiene, money: inc.money });
   }
   if (mode === 'cycle' && S.weather === 'rain') fx({ hygiene: -8, fun: -3 });
+  if (mode === 'tube' && S.weather === 'heat') fx({ hygiene: -6 });
   if (mode === 'walk' && S.weather === 'sun') fx({ fun: 4 });
   if ((mode === 'walk' || mode === 'cycle') && Online.policy() === 'clean_air') fx({ fun: 3 });
   advance(mins);
@@ -266,9 +317,10 @@ function travel(to, mode) {
   S.loc = to;
   ui.target = null;
   ui.tab = 'here';
-  World.moveAvatar(to);
-  World.focus(to);
+  const path = mode === 'cab' ? [from, to] : route(from, to);
+  World.travelAnim(to, mode, path, routeColours(path));
   Online.moveTo(to);
+  Coach.event('travel', { to, mode });
   log(`${o.label.split(' ')[0]} ${LOCATIONS[from].name} → ${LOCATIONS[to].name} (${mins} min${o.cost ? ', ' + money(o.cost) : ''}).${extra}`);
   afterAction();
 }
@@ -331,6 +383,7 @@ function workShift(hrs) {
   const factor = 0.75 + mood() / 400;
   let pay = round2(hrs * jobLevel()[1] * factor * (Online.policy() === 'wage_rise' ? 1.1 : 1));
   if (hrs >= 12) pay = round2(pay * 1.2);
+  if (S.job === 'rider' && ['rain', 'snow'].includes(S.weather)) pay = round2(pay * 1.3); // orders surge in bad weather
   S.weekHours += hrs;
   S.stats.shifts++;
   const tip = ['barista', 'rider', 'guide', 'bartender'].includes(S.job) ? Math.round(Math.random() * 10) : 0;
@@ -397,15 +450,19 @@ function placeActions(loc) {
   const h = hour();
 
   if (atHome) {
-    const quality = S.bg === 'oldmoney' ? 100 : 85;
-    A.push(act('😴 Sleep (8h)', { mins: 480, sleep: true, run: () => '😴 You slept.' + fx({ energy: quality, hygiene: -5 }) }));
+    const F = S.furniture || {};
+    const comfort = homeComfort();
+    const quality = (S.bg === 'oldmoney' ? 100 : 85) + (F.bed ? 10 : 0);
+    A.push(act('😴 Sleep (8h)', { mins: 480, sleep: true, run: () => '😴 You slept.' + fx({ energy: quality, hygiene: -5, fun: Math.round(comfort / 6) }) }));
     A.push(act('💤 Nap (2h)', { mins: 120, sleep: true, run: () => '💤 Power nap.' + fx({ energy: 22 }) }));
     A.push(act('🚿 Shower', { mins: 20, run: () => '🚿 Fresh.' + fx({ hygiene: 100, fun: 2 }) }));
     A.push(act('🍳 Cook a meal', {
       mins: 60, disabled: S.groceries < 1 ? 'No groceries. Buy some at a market' : null,
       run: () => { S.groceries--; return '🍳 You cooked ' + pick(['jollof rice', 'egusi and pounded yam', 'pasta with too much cheese', 'a fry-up', 'chicken curry']) + '.' + fx({ hunger: 50, fun: 4 }); },
     }));
-    A.push(act('📺 Watch telly', { mins: 120, run: () => '📺 ' + pick(['Binged Top Boy.', 'Watched Bake Off. Cried a little.', 'Watched Nollywood on YouTube.', 'Watched Love Island and judged everyone.']) + fx({ fun: 22, energy: 5 }) }));
+    A.push(act('📺 Watch telly', { mins: 120, run: () => '📺 ' + pick(['Binged Top Boy.', 'Watched Bake Off. Cried a little.', 'Watched Nollywood on YouTube.', 'Watched Love Island and judged everyone.']) + fx({ fun: 22 + (F.tv ? 10 : 0) + (F.speaker ? 4 : 0), energy: 5 }) }));
+    if (F.sofa) A.push(act('🛋️ Have friends round (£15 snacks)', { mins: 180, cost: 15, disabled: h >= 12 && h < 23 ? null : 'Noon to 11pm', run: () => '🛋️ Friends round, snacks out, debates about jollof. Your place is the place.' + fx({ social: 30, fun: 15 + Math.round(comfort / 4), hunger: 10 }) }));
+    if (F.desk) A.push(act('💻 Study coding at home', { mins: 120, run: () => '💻 Two hours of tutorials at your own desk.' + fx({ code: 3, energy: -6, fun: -2 }) }));
     if (S.bg === 'immigrant') {
       A.push(act('📞 Call home', { mins: 60, run: () => '📞 Your mum asked if you\'ve met the King yet. ' + fx({ social: 22, family: 6, fun: 6 }) }));
       A.push(act('💸 Send £100 home', { mins: 10, cost: 100, run: () => { S.stats.sentHome += 100; return '💸 Sent £100 home. The family group chat is full of prayers for you.' + fx({ family: 15, fun: 5 }); } }));
@@ -519,7 +576,7 @@ function placeActions(loc) {
     ],
     woolwich: [
       act('🎉 Owambe party', { mins: 300, cost: 20, disabled: dow() === 5 && h >= 14 ? null : 'Owambe is Saturday afternoon', run: () => { S.rel.chidi = clamp(S.rel.chidi + 8); return '🎉 Aso-ebi, jollof and spraying money on the dance floor. Lagos in London!' + fx({ fun: 40, social: 35, hunger: 40, energy: -15 }); } }),
-      act('⛴️ Ride the Woolwich Ferry', { mins: 45, run: () => '⛴️ Free ferry across the Thames. Underrated.' + fx({ fun: 8 }) }),
+      act('⛴️ Ride the Woolwich Ferry', { mins: 45, disabled: S.weather === 'fog' ? 'Ferry suspended in the fog' : null, run: () => '⛴️ Free ferry across the Thames. Underrated.' + fx({ fun: 8 }) }),
       act('🍛 Jollof at Mama Put (£10)', { mins: 45, cost: 10, run: () => '🍛 Proper smoky party jollof. Tastes like home.' + fx({ hunger: 50, fun: 8 }) }),
     ],
     peckham: [
@@ -595,9 +652,33 @@ function placeActions(loc) {
     }
   }
 
+  // Weather
+  if (S.weather === 'snow' && ['hydepark', 'greenwich', 'battersea'].includes(loc)) {
+    A.push(act('⛄ Build a snowman', { mins: 60, run: () => '⛄ Built a lopsided snowman. Someone gave it a Tube map scarf.' + fx({ fun: 20, energy: -4 }) }));
+    A.push(act('❄️ Snowball fight', { mins: 60, run: () => '❄️ Snowball fight with total strangers. Peak London.' + fx({ fun: 18, social: 14, energy: -6, hygiene: -4 }) }));
+  }
+  if (['heat', 'sun'].includes(S.weather) && ['southbank', 'hydepark', 'greenwich', 'brixton'].includes(loc)) {
+    A.push(act('🍦 Ice cream (£3.50)', { mins: 15, cost: 3.5, run: () => '🍦 A 99 with a flake. It melted down your arm in seconds.' + fx({ fun: 8, hunger: 6 }) }));
+  }
+  // London calendar
+  for (const ev of eventsOn()) {
+    if (!ev.action || ev.place !== loc) continue;
+    const a = ev.action;
+    const [from, to] = a.hours;
+    A.push(act(a.label, {
+      mins: a.mins, cost: a.cost || 0, sub: `${ev.icon} ${ev.name}`,
+      disabled: openBetween(from, to % 24) ? null : `${from}:00 to ${to % 24 === 0 ? 'midnight' : to + ':00'}`,
+      run: () => { S.flags['did_' + ev.id] = true; return `${ev.icon} ${ev.name}: one for the memories.` + fx(a.fx); },
+    }));
+  }
+
   A.push(act('⏳ Hang about (1h)', { mins: 60, run: () => '⏳ ' + pick(['People-watched for an hour.', 'Scrolled TikTok on a bench.', 'Watched pigeons fight over a chip.']) }));
   for (const a of A) if (!a.disabled && a.cost > S.money) a.disabled = 'Not enough money';
   return A;
+}
+
+function homeComfort() {
+  return Object.keys(S.furniture || {}).reduce((sum, k) => sum + (FURNITURE[k] ? FURNITURE[k].comfort : 0), 0);
 }
 
 function runAction(a) {
@@ -607,6 +688,7 @@ function runAction(a) {
   if (S.over) return afterAction();
   const text = a.run ? a.run() : '';
   if (text) log(text, /🎉|APPROVED|PASSED|DEBT FREE/.test(text) ? 'good' : /😞|Failed/.test(text) ? 'bad' : '');
+  Coach.event('action', a);
   afterAction();
 }
 
@@ -648,6 +730,8 @@ function afterAction() {
 
 const EVENTS = {
   strike: { title: '🚇 Tube strike!', text: 'The RMT has called a strike. No Tube today. Buses will be rammed and everyone will be late.', choices: [{ label: 'Typical. Bus it is.', run: () => '' }] },
+  snowDay: { title: '❄️ Snow day!', text: 'Two centimetres of snow and London has ground to a halt. Buses are crawling, nobody should cycle and everyone is building snowmen in the parks.', choices: [{ label: 'Snowball fight!', run: () => fx({ fun: 12, social: 8, energy: -5 }) }, { label: 'Stay cosy', run: () => fx({ fun: 4 }) }] },
+  fogDay: { title: '🌫️ Thames fog', text: 'A thick fog has rolled up the river. You can\'t see the top of the Shard, cabs are crawling and the Woolwich Ferry is suspended.', choices: [{ label: 'Very Sherlock Holmes', run: () => fx({ fun: 3 }) }] },
   heatwave: { title: '🥵 Heatwave', text: '33°C. The Central line is hotter than the legal limit for transporting cattle. Nobody in London owns a fan.', choices: [{ label: 'Suffer in silence', run: () => fx({ energy: -10, hygiene: -10 }) }] },
   chidiHello: { title: '📱 WhatsApp from Chidi', text: '"Welcome to London! I came here six years ago with one suitcase too. Come to Woolwich and I\'ll show you around. Rule one: always stand on the right."', choices: [{ label: 'On my way!', run: () => fx({ social: 10, fun: 5 }) }] },
   visaWarn: { title: '🛂 Home Office letter', text: 'Your starter visa expires on day 35. If you\'re not on a Skilled Worker visa by then, you\'re going home. Get a job that sponsors visas, then apply at Lunar House in Croydon.', choices: [{ label: 'No pressure then 😬', run: () => fx({ fun: -5 }) }] },
@@ -696,13 +780,6 @@ const RANDOM_EVENTS = {
       { label: 'Use your old cracked phone', run: () => fx({ social: -15, charm: -2 }) },
     ],
   },
-  carnival: {
-    cond: () => day() >= 22 && day() <= 32 && isWeekend() && !S.flags.carnival, title: '🎊 Notting Hill Carnival!', text: 'Steel drums, sound systems, jerk chicken and a million people. It only happens once a year.',
-    choices: [
-      { label: 'Go! (£25, 6h)', cost: 25, run: () => { S.flags.carnival = true; advance(360); return fx({ money: -25, fun: 45, social: 30, hunger: 30, energy: -20 }); } },
-      { label: 'Too crowded', run: () => { S.flags.carnival = true; return fx({ fun: -5 }); } },
-    ],
-  },
   crypto: {
     cond: () => S.money > 250, title: '🚀 "Guaranteed" crypto', text: 'Your cousin swears $JOLLOF coin is going to the moon. "Put £200 in. Trust me."',
     choices: [
@@ -742,6 +819,14 @@ function processQueue() {
   if (typeof item === 'object' && item.perk) {
     openModal(`<h2>🤝 Friendship perk</h2><p>${esc(item.perk)}</p><div class="choices"><button class="btn primary" data-ok>Nice!</button></div>`);
     $('[data-ok]').onclick = () => { S.queue.shift(); log(item.perk, 'good'); closeModal(); save(); render(); processQueue(); };
+    return;
+  }
+  if (typeof item === 'object' && item.cal) {
+    const c = CALENDAR.find((x) => x.id === item.cal);
+    if (!c) { S.queue.shift(); return processQueue(); }
+    const where = c.action && c.place ? `<p class="hint">${esc(c.action.label)} at ${esc(LOCATIONS[c.place].name)}, ${c.action.hours[0]}:00 to ${c.action.hours[1] % 24 === 0 ? 'midnight' : c.action.hours[1] + ':00'}.</p>` : '';
+    openModal(`<p class="eyebrow">London calendar · ${dateLabel()}</p><h2>${c.icon} ${esc(c.name)}</h2><p>${esc(c.text)}</p>${where}<div class="choices"><button class="btn primary" data-ok>${c.action ? 'Sounds good' : 'OK'}</button></div>`);
+    $('[data-ok]').onclick = () => { S.queue.shift(); log(`${c.icon} ${c.name}: ${c.text}`, 'good'); closeModal(); save(); render(); processQueue(); };
     return;
   }
   const ev = EVENTS[item] || RANDOM_EVENTS[item];
@@ -886,9 +971,11 @@ function render() {
   if (!S) return;
   const w = WEATHER.find((x) => x.id === S.weather);
   const live = Online.signedIn() ? ` · <span class="online-count">${Online.state.players.length.toLocaleString()} online</span>` : '';
-  $('#clockPill').innerHTML = `<i class="dot"></i>Day ${Math.min(day(), GAME_DAYS)}/${GAME_DAYS} · ${DAYS[dow()]} ${clock()}${live}`;
+  const gd = gameDate();
+  $('#clockPill').innerHTML = `<i class="dot"></i><span>Day ${Math.min(day(), GAME_DAYS)}<span class="wide">/${GAME_DAYS}</span> · <span class="wide">${DAYS[dow()]} </span>${gd.getDate()} ${MONTHS[gd.getMonth()]} ${clock()}${live}</span>`;
   $('#topActions').innerHTML = `
     <span class="pill money ${S.money < 0 ? 'neg' : ''}">💷 ${money(S.money)}</span>
+    <button class="pill icon hint-btn" id="hintBtn" aria-label="Get a hint" title="Get a hint (H)">💡</button>
     <button class="pill icon" id="helpBtn" aria-label="How to play">?</button>
     <button class="pill icon" id="menuBtn" aria-label="Menu">☰</button>`;
   const chips = [
@@ -899,6 +986,7 @@ function render() {
   if (S.debt > 0) chips.push(`💳 Debt ${money(S.debt)}`);
   if (S.visa) chips.push(S.visa.type === 'student' ? `🛂 Starter visa: ${Math.max(0, S.visa.expires - day())} days` : '🛂 Skilled Worker ✅');
   if (S.strike) chips.push('🚇 Tube strike');
+  for (const ev of eventsOn()) chips.push(`${ev.icon} ${esc(ev.name)}`);
   const pol = Online.policy();
   if (pol) chips.unshift(`${Online.POLICIES[pol].icon} ${Online.POLICIES[pol].label}`);
   const hall = Online.state.hall;
@@ -913,15 +1001,18 @@ function render() {
     <button class="me-chip" id="meChip" aria-label="Your stats"><img class="avatar-img" src="${Avatar.portrait(S.look)}" alt=""><span><b>${flagOf(S.country)} ${esc(S.name)}</b><small>${mEmoji} ${mText}</small></span></button>
     <div class="rings">${Object.keys(S.needs).map((k) => {
       const v = Math.round(S.needs[k]);
-      const col = v < 25 ? 'var(--bad)' : v < 50 ? 'var(--amber)' : 'var(--green)';
-      return `<span class="ring" style="--v:${v};--c:${col}" title="${NEED_LABELS[k]} ${v}"><i>${NEED_ICONS[k]}</i></span>`;
+      const lvl = v < 25 ? 'low' : v < 50 ? 'mid' : 'ok';
+      return `<span class="ring ${lvl}" style="--v:${v}" role="img" aria-label="${NEED_LABELS[k]} ${v} out of 100" title="${NEED_LABELS[k]} ${v}"><i>${NEED_ICONS[k]}</i></span>`;
     }).join('')}</div>`;
 
+  Coach.renderHUD();
   renderSheet();
   World.markPins(S.loc, S.home, ui.target);
   World.setTime(hour() + (S.t % 60) / 60, S.weather);
+  World.setEvents(eventsOn());
 
   $('#helpBtn').onclick = showHelp;
+  $('#hintBtn').onclick = Coach.openHints;
   $('#menuBtn').onclick = showMenu;
   $('#meChip').onclick = () => { ui.target = null; ui.tab = 'me'; ui.expanded = true; renderSheet(); };
   $('#ticker').onclick = () => { ui.target = null; ui.tab = 'story'; ui.expanded = true; renderSheet(); };
@@ -948,7 +1039,9 @@ function renderSheet() {
   if (ui.tab === 'here') {
     const acts = placeActions(S.loc);
     sheet.querySelectorAll('[data-act]').forEach((b) => { b.onclick = () => runAction(acts[+b.dataset.act]); });
+    if ($('#decorateBtn')) $('#decorateBtn').onclick = () => Home.open();
   }
+  if (ui.tab === 'me') Coach.bindWardrobe(sheet);
   if (LiveUI.TABS.includes(ui.tab)) LiveUI.bindTab(ui.tab, sheet);
 }
 
@@ -961,6 +1054,7 @@ function hereHTML() {
     <div class="place-head">
       <span class="place-icon">${S.loc === S.home ? '🏠' : loc.icon}</span>
       <div><h3>${esc(loc.name)}</h3><small>Zone ${loc.zone}${S.loc === S.home ? ' · Your home' : ''}</small></div>
+      ${S.loc === S.home ? '<button class="btn white small-btn decorate" id="decorateBtn">🛋️ Decorate</button>' : ''}
     </div>
     <p class="desc">${esc(loc.desc)}</p>
     ${npcs.map((n) => `<p class="npc">${n.emoji} <b>${n.name}</b> is around. ${esc(n.desc)}</p>`).join('')}
@@ -995,6 +1089,7 @@ function meHTML() {
         </div>
         <h4>Friends</h4>
         <div class="bag">${Object.entries(NPCS).map(([id, n]) => `<span>${n.emoji} ${n.name} ${S.rel[id]}</span>`).join('')}</div>
+        ${Coach.wardrobeHTML()}
       </div>
     </div>`;
 }
@@ -1035,6 +1130,7 @@ function selectPlace(id) {
   if (!ui.target) ui.tab = 'here';
   World.focus(id);
   render();
+  Coach.event('select', id);
 }
 
 function fmtMins(m) {
@@ -1052,7 +1148,9 @@ function showHelp() {
       <li>💼 <b>Get a job</b> at its location. Better jobs need skills: study at King's Cross, network in the City and Shoreditch, hustle at Camden.</li>
       <li>🤝 <b>Make friends</b> (Chidi in Woolwich, Jade in Peckham, Tom in Chelsea, Priya in Shoreditch). Close friends unlock perks.</li>
       <li>🏠 <b>Rent</b> is taken every Monday. Two weeks in your overdraft and you're evicted.</li>
-      <li>🏆 <b>Goal:</b> ${esc(BACKGROUNDS[S.bg].goal)}</li>
+      <li>🏆 <b>Goal:</b> ${esc(BACKGROUNDS[S.bg].goal)} The 🎯 tracker shows your next step.</li>
+      <li>💡 <b>Stuck?</b> Tap the bulb for a hint. Hints are free for your first 2 days, then cost a little.</li>
+      <li>⌨️ <b>Keyboard:</b> arrows or WASD move the map, + and - zoom, P lists places, 1 to 9 do the actions here, H for a hint, M for the menu.</li>
     </ul>
     <div class="choices"><button class="btn primary" data-close>Let's go</button></div>`);
   $('[data-close]').onclick = () => { closeModal(); processQueue(); };
@@ -1067,8 +1165,10 @@ function showMenu() {
       ${['high', 'medium', 'low'].map((q) => `<button class="${World.getQuality() === q ? 'on' : ''}" data-quality="${q}">${{ high: 'High', medium: 'Medium', low: 'Low' }[q]}</button>`).join('')}
     </div>
     <p class="hint">High adds soft shadows, ambient occlusion and glow. Use Low if your phone gets hot or slow.</p>
+    ${Coach.settingsHTML()}
     <div class="choices vertical">
       <button class="btn primary" data-close>Resume</button>
+      <button class="btn" id="placesBtn">🗺️ All places</button>
       <button class="btn" id="howBtn">How to play</button>
       <button class="btn" id="titleBtn">Title screen</button>
       <button class="btn danger" id="restartBtn">Start a new life</button>
@@ -1082,6 +1182,8 @@ function showMenu() {
     };
   });
   $('#howBtn').onclick = showHelp;
+  $('#placesBtn').onclick = Coach.showPlaces;
+  Coach.bindSettings();
   $('#titleBtn').onclick = () => { closeModal(); showTitle(); };
   $('#restartBtn').onclick = (e) => {
     if (!e.currentTarget.dataset.armed) {
@@ -1101,7 +1203,10 @@ function openModal(html) {
   const first = $('#modal-card button:not([disabled])');
   if (first) first.focus();
 }
-function closeModal() { $('#modal').classList.add('hidden'); }
+function closeModal() {
+  if ($('#modal').contains(document.activeElement)) document.activeElement.blur();
+  $('#modal').classList.add('hidden');
+}
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('hidden', s.id !== id));
@@ -1217,7 +1322,7 @@ function newGame() {
   const B = BACKGROUNDS[create.bg];
   const look = lookFromCreate();
   S = {
-    v: 1, name: (create.name || 'Tunde').trim().slice(0, 16) || 'Tunde', bg: create.bg, look, country: create.country || 'GB',
+    v: 1, name: (create.name || 'Tunde').trim().slice(0, 16) || 'Tunde', bg: create.bg, look, country: create.country || 'GB', start: isoDate(new Date()),
     t: 8 * 60, loc: create.bg === 'immigrant' ? 'heathrow' : B.home, home: B.home,
     money: B.money, debt: B.debt, rent: B.rent, allowance: create.bg === 'oldmoney' ? 400 : 0,
     needs: { hunger: 70, energy: create.bg === 'immigrant' ? 45 : 75, fun: 65, social: 55, hygiene: create.bg === 'immigrant' ? 50 : 80 },
@@ -1227,6 +1332,8 @@ function newGame() {
     perks: {}, flags: {}, weather: 'grey', strike: false, fares: { tube: 0, bus: 0 }, overdraftWeeks: 0,
     stats: { tubeTrips: 0, busTrips: 0, earned: 0, spent: 0, sentHome: 0, shifts: 0, pints: 0, promotions: 0 },
     log: [], queue: [], cooldown: {}, over: null,
+    furniture: Object.fromEntries(START_FURNITURE[create.bg].map((k) => [k, true])), wall: 0,
+    tut: { step: 0 },
   };
   S.weather = rollWeather();
   const intro = {
@@ -1241,7 +1348,20 @@ function newGame() {
     Online.pushSaveNow(S);
   }
   startGame();
-  showHelp();
+}
+
+// Saves from before the calendar get a start date that keeps their weekdays the same.
+function migrate(st) {
+  if (!st.start) {
+    const d = new Date();
+    d.setDate(d.getDate() - Math.floor(st.t / 1440));
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    st.start = isoDate(d);
+  }
+  if (!st.furniture) { st.furniture = Object.fromEntries((START_FURNITURE[st.bg] || []).map((k) => [k, true])); st.wall = 0; }
+  if (!st.tut) st.tut = { done: true };
+  if (!st.country) st.country = st.bg === 'immigrant' ? 'NG' : 'GB'; // saves from before the country picker
+  return st;
 }
 
 function startGame() {
@@ -1255,7 +1375,7 @@ function startGame() {
   }
   render();
   if (S.over) showEnd();
-  else processQueue();
+  else { processQueue(); Coach.start(); }
 }
 
 function init() {
@@ -1279,19 +1399,22 @@ function init() {
       if (cloud && !cloud.over && (!S || (cloud.savedAt || 0) > (S.savedAt || 0))) S = cloud;
     }
     if (!S) return;
-    if (!S.country) S.country = S.bg === 'immigrant' ? 'NG' : 'GB'; // saves from before the country picker
+    migrate(S);
     startGame();
   };
   $('#startBtn').onclick = newGame;
+  $('#newBtn').disabled = false;
   $('#backBtn').onclick = showTitle;
   $('#modal').addEventListener('click', (e) => {
     if (e.target.id === 'modal' && (!S || (!S.over && !S.queue.length))) closeModal();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('#modal').classList.contains('hidden') && S && !S.over && !S.queue.length) closeModal();
+    if (e.key === 'Escape' && Home.isOpen() && $('#modal').classList.contains('hidden')) { Home.close(); return; }
+    if (e.key === 'Escape' && !$('#modal').classList.contains('hidden') && S && !S.over && !S.queue.length) { closeModal(); processQueue(); }
   });
+  Coach.init();
   showTitle();
 }
 
 // js/boot.js calls this once every script has loaded.
-window.startLondonHustle = init;
+window.startLondonHustle = () => { performance.mark('lh-scripts'); init(); performance.mark('lh-init'); };

@@ -15,7 +15,13 @@ Choose where you're from (about 50 countries, shown by flag), then one of three 
 ## What's in the world
 
 - **The full London map**, placed from real coordinates: the Thames follows its real course (including the Isle of Dogs and Greenwich loops), with Hyde Park and the Serpentine, Regent's Park, Hampstead Heath, Greenwich Park, Victoria Park, Battersea Park and more.
-- **40 landmarks**: Big Ben and Parliament, Westminster Abbey, the London Eye, Buckingham Palace, Nelson's Column, Piccadilly Circus, BT Tower, the British Museum, St Paul's, the Millennium Bridge, Tate Modern, the Shard, Tower Bridge, the Tower of London, the Gherkin, the Walkie-Talkie, the Cheesegrater, Canary Wharf, the O2, the Cutty Sark, the Royal Observatory, the Thames Barrier, Battersea Power Station, the Royal Albert Hall, the Natural History Museum, Harrods, Kensington Palace, Wembley, the Emirates, the London Stadium and the Orbit, Alexandra Palace, Crystal Palace and Heathrow.
+- **Trains you can see**: every Tube line, the Overground, the Elizabeth line and rail run on their own tracks in their line colours, and the DLR runs on a raised viaduct. When you take the Tube you ride a train in the line's colour along the real route.
+- **Stations and bridges**: an Underground entrance at every place (our own design, not the TfL roundel), the nine mainline termini (Paddington, Euston, St Pancras, Liverpool Street, Waterloo, Victoria, London Bridge, Marylebone, Charing Cross) and eleven Thames bridges from Hammersmith to London Bridge.
+- **A real London calendar**: the game follows today's date, with Notting Hill Carnival, Bonfire Night fireworks, the Christmas lights on Oxford Street, Winter Wonderland and New Year's Eve over the Thames. Snow days, heatwaves and Thames fog change what you can do.
+- **A home to decorate**: furnish and paint your room in 3D. Comfort makes sleep and home time better.
+- **Help when you need it**: a 60-second guided start, a goal tracker that always shows your next step, 💡 hints (free for your first 2 days, then a small fee) and a daily login streak with rare outfits.
+- **Accessible**: bigger text, colour-blind-safe colours and full keyboard play.
+- **60 landmarks**: Big Ben and Parliament, Westminster Abbey, the London Eye, Buckingham Palace, Nelson's Column, Piccadilly Circus, BT Tower, the British Museum, St Paul's, the Millennium Bridge, Tate Modern, the Shard, Tower Bridge, the Tower of London, the Gherkin, the Walkie-Talkie, the Cheesegrater, Canary Wharf, the O2, the Cutty Sark, the Royal Observatory, the Thames Barrier, Battersea Power Station, the Royal Albert Hall, the Natural History Museum, Harrods, Kensington Palace, Wembley, the Emirates, the London Stadium and the Orbit, Alexandra Palace, Crystal Palace and Heathrow.
 - **Street life**: red buses, black cabs, river boats, red phone boxes and parody billboards. Day turns to night and it actually rains.
 - **A modern 3D engine** (Three.js 0.169): real-time soft shadows, ambient occlusion, reflective glass and water, drifting cloud shadows, and windows that light up at night. A High, Medium or Low graphics setting keeps phones smooth.
 - **Memoji-style 3D characters**: 8 skin tones, 12 hairstyles, 9 hair colours, headwear (beanie, cap, bucket hat, beret, gele, hijab, turban), glasses, facial hair, earrings and outfits.
@@ -72,8 +78,10 @@ js/online.js   Live London: auth, cloud saves, presence, chat, friends, City Hal
 js/live-ui.js  screens for sign-up, chat, people and City Hall
 js/data.js     world data: places (real coordinates), Tube lines, jobs, headlines
 js/avatar.js   Memoji-style 3D characters and portraits
-js/game.js     engine: time, needs, travel, careers, events, endings, HUD
-js/world.js    the 3D city (Three.js): Thames, parks, landmarks, traffic, camera
+js/game.js     engine: time, calendar, weather, needs, travel, careers, events, endings, HUD
+js/coach.js    hints, guided start, goal tracker, daily rewards, wardrobe, accessibility, keyboard
+js/home.js     your home: the 3D room you furnish and paint
+js/world.js    the 3D city (Three.js): Thames, bridges, parks, landmarks, railways, stations, people, traffic, festivals, camera
 docs/PRD.md    product requirements
 supabase/      database migrations for Live London
 ```

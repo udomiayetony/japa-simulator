@@ -26,10 +26,10 @@
     <div class="card title-card">
       <h1>Live your London story</h1>
       <p>Tube strikes, £7 pints, visa deadlines and Owambe on Saturday. Can you survive 60 days in London?</p>
-      <div class="title-meta"><span>24 neighbourhoods</span><span>40 landmarks</span><span>3 starting lives</span><span>Free, no download</span></div>
+      <div class="title-meta"><span>24 neighbourhoods</span><span>60 landmarks</span><span>Trains, bridges &amp; a real calendar</span><span>Free, no download</span></div>
       <div class="row">
-        <button class="btn green big" id="newBtn">Start a new life</button>
-        <button class="btn white big" id="continueBtn">Continue</button>
+        <button class="btn green big" id="newBtn" disabled>Start a new life</button>
+        <button class="btn white big hidden" id="continueBtn">Continue</button>
       </div>
       <div class="title-online" id="titleOnline"></div>
     </div>
@@ -54,14 +54,18 @@
     <div class="chips" id="chips"></div>
     <button class="ticker" id="ticker" aria-label="Open your story"></button>
     <div class="bottom">
+      <div class="coach" id="coach"></div>
       <div class="dock" id="dock"></div>
       <section class="sheet card" id="sheet"></section>
     </div>
   </section>
 
+  <div id="home" class="home-screen hidden" role="dialog" aria-modal="true" aria-label="Decorate your home"></div>
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div id="modal-card" class="modal-card"></div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <noscript><p class="noscript">London Hustle needs JavaScript to run.</p></noscript>
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js">
   <script type="importmap">
     {
       "imports": {

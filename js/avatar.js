@@ -274,12 +274,21 @@ const Avatar = (() => {
       new THREE.Vector2(1.04, -1.65), new THREE.Vector2(0.92, -1.3), new THREE.Vector2(0.5, -1.16), new THREE.Vector2(0, -1.13),
     ], 32);
     add(g, torso, top, 0, 0, -0.05, 1, 1, 0.78);
+    // Arms and legs hang from pivots at the shoulder and hip so they can swing when walking.
     for (const s of [-1, 1]) {
-      const arm = add(g, new THREE.CylinderGeometry(0.22, 0.2, 1.15, 16), top, s * 1.08, -1.95, -0.05);
-      arm.rotation.z = s * 0.14;
-      add(g, sphere(0.21, 16, 12), skin, s * 1.17, -2.6, -0.02);
-      add(g, new THREE.CylinderGeometry(0.29, 0.26, 1.0, 16), legsM, s * 0.42, -3.1, -0.05);
-      add(g, sphere(0.3, 16, 12), shoe, s * 0.42, -3.62, 0.08, 1.05, 0.62, 1.5);
+      const shoulder = new THREE.Group();
+      shoulder.position.set(s * 1.0, -1.38, -0.05);
+      shoulder.rotation.z = s * 0.14;
+      shoulder.userData.limb = { kind: 'arm', side: s };
+      add(shoulder, new THREE.CylinderGeometry(0.22, 0.2, 1.15, 16), top, 0, -0.575, 0);
+      add(shoulder, sphere(0.21, 16, 12), skin, 0, -1.22, 0.03);
+      g.add(shoulder);
+      const hip = new THREE.Group();
+      hip.position.set(s * 0.42, -2.6, -0.05);
+      hip.userData.limb = { kind: 'leg', side: s };
+      add(hip, new THREE.CylinderGeometry(0.29, 0.26, 1.0, 16), legsM, 0, -0.5, 0);
+      add(hip, sphere(0.3, 16, 12), shoe, 0, -1.02, 0.13, 1.05, 0.62, 1.5);
+      g.add(hip);
     }
     return g;
   }
