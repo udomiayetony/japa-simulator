@@ -27,6 +27,8 @@ body {
 }
 h1, h2, h3, h4 { margin: 0; letter-spacing: -.01em; text-wrap: balance; }
 button { font: inherit; color: inherit; }
+input, select, textarea { font: inherit; color: var(--ink); background: #fff; caret-color: var(--green); color-scheme: light; }
+input::placeholder { color: var(--muted); }
 .hidden { display: none !important; }
 
 /* ------------------------------------------------ the city */
@@ -111,7 +113,7 @@ button.pill { cursor: pointer; }
 .preview { background: linear-gradient(#e2efd4, #f4f6ef); border-radius: 20px; padding: 12px; text-align: center; }
 .preview .avatar { width: 140px; height: 190px; }
 .field { display: flex; flex-direction: column; gap: 4px; text-align: left; font-weight: 700; font-size: 13px; }
-.field input { font: inherit; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; }
+.field input { font: inherit; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); -webkit-text-fill-color: var(--ink); }
 .field input:focus { outline: none; border-color: var(--green); }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatch { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1.5px var(--line); cursor: pointer; }
