@@ -1,4 +1,6 @@
+/* One deliberate look: London transport navy and bus red on cream paper. */
 :root {
+  color-scheme: light;
   --navy: #0f2341;
   --red: #d52b1e;
   --cream: #fbf6ec;
@@ -59,7 +61,7 @@ button { font: inherit; color: inherit; }
 @keyframes drive { from { left: -80px; } to { left: 105%; } }
 
 /* ------------------------------------------------ create */
-#create { padding: 24px 16px; }
+#create { padding-block: 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .create-card { max-width: 980px; margin: 0 auto; background: var(--paper); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
 .create-card > h2 { font-size: 30px; color: var(--navy); margin-bottom: 16px; }
 .create-card h4 { margin: 14px 0 8px; color: var(--navy); }
@@ -87,7 +89,7 @@ button { font: inherit; color: inherit; }
 .bg-card.on { border-color: var(--red); box-shadow: 0 0 0 3px rgba(213, 43, 30, .15); }
 
 /* ------------------------------------------------ game layout */
-#game { padding: 12px; max-width: 1500px; margin: 0 auto; }
+#game { padding-block: 12px; padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); max-width: 1500px; margin: 0 auto; }
 .hud {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch;
   background: var(--navy); color: #fff; border-radius: var(--radius); padding: 8px; margin-bottom: 12px;
@@ -213,7 +215,7 @@ button { font: inherit; color: inherit; }
   .place { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
-  #game { padding: 8px; }
+  #game { padding-block: 8px; }
   .grid { grid-template-columns: 1fr; }
   .center { display: contents; }
   .mapwrap { order: 1; }
@@ -226,4 +228,9 @@ button { font: inherit; color: inherit; }
   .hud-item b { font-size: 13px; }
   #map .st-label { font-size: 17px; }
   .end-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bus, .avatar .bob, .avatar .orb { animation: none; }
+  .modal-card { animation: none; }
 }

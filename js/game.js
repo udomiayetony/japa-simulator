@@ -1002,8 +1002,13 @@ function showMenu() {
     </div>`);
   $('[data-close]').onclick = () => { closeModal(); processQueue(); };
   $('#titleBtn').onclick = () => { closeModal(); showTitle(); };
-  $('#restartBtn').onclick = () => {
-    if (confirm('Start over? Your current game will be lost.')) { clearSave(); S = null; closeModal(); showScreen('create'); }
+  $('#restartBtn').onclick = (e) => {
+    if (!e.currentTarget.dataset.armed) {
+      e.currentTarget.dataset.armed = '1';
+      e.currentTarget.textContent = 'Tap again to lose this game';
+      return;
+    }
+    clearSave(); S = null; closeModal(); showScreen('create');
   };
 }
 
@@ -1104,14 +1109,17 @@ function startGame() {
 function init() {
   $('#newBtn').onclick = () => {
     const saved = load();
-    if (saved && !saved.over && !confirm('Start a new life? Your saved game will be replaced.')) return;
-    showScreen('create');
+    if (!saved || saved.over) return showScreen('create');
+    openModal(`<h2>Start a new life?</h2><p>Your saved game (${esc(saved.name)}, day ${Math.floor(saved.t / 1440) + 1}) will be replaced.</p>
+      <div class="choices"><button class="btn" data-close>Keep my save</button><button class="btn primary" id="confirmNew">Start fresh</button></div>`);
+    $('[data-close]').onclick = closeModal;
+    $('#confirmNew').onclick = () => { clearSave(); closeModal(); showScreen('create'); };
   };
   $('#continueBtn').onclick = () => { S = load(); if (S) startGame(); };
   $('#startBtn').onclick = newGame;
   $('#backBtn').onclick = showTitle;
   $('#modal').addEventListener('click', (e) => {
-    if (e.target.id === 'modal' && S && !S.over && !S.queue.length) closeModal();
+    if (e.target.id === 'modal' && (!S || (!S.over && !S.queue.length))) closeModal();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('#modal').classList.contains('hidden') && S && !S.over && !S.queue.length) closeModal();
