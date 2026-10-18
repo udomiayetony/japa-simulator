@@ -5,9 +5,19 @@
 const Avatar = (() => {
   const PI = Math.PI;
   const mats = {};
-  function phong(color, shininess = 18, specular = 0x262626, extra = {}) {
-    const key = color + shininess + specular + JSON.stringify(extra);
-    if (!mats[key]) mats[key] = new THREE.MeshPhongMaterial({ color, shininess, specular, ...extra });
+  // Glossy, clear-coated materials give the soft Memoji sheen. `shininess` maps to
+  // roughness; the second argument is kept from the older Phong-based version.
+  function phong(color, shininess = 18, specular = 0, extra = {}) {
+    const key = color + shininess + JSON.stringify(extra);
+    if (!mats[key]) {
+      const roughness = Math.max(0.12, Math.min(0.75, 0.78 - shininess / 160));
+      mats[key] = new THREE.MeshPhysicalMaterial({
+        color, roughness, metalness: 0,
+        clearcoat: shininess >= 60 ? 1 : 0.45, clearcoatRoughness: shininess >= 60 ? 0.05 : 0.35,
+        sheen: 0.06, sheenRoughness: 0.7, sheenColor: '#ffffff',
+        ...extra,
+      });
+    }
     return mats[key];
   }
   const geos = {};
@@ -290,11 +300,17 @@ const Avatar = (() => {
     if (pr) return pr;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(1);
-    renderer.setSize(320, 320, false);
+    renderer.setSize(360, 360, false);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
     const scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight('#ffffff', '#9a8f86', 0.62));
-    const key = new THREE.DirectionalLight('#ffffff', 0.72); key.position.set(-2.5, 3, 5); scene.add(key);
-    const rim = new THREE.DirectionalLight('#dfe8ff', 0.45); rim.position.set(3, 2, -3); scene.add(rim);
+    // Studio lighting: soft environment, a warm key light and a cool rim light.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new FX.RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.55;
+    scene.add(new THREE.HemisphereLight('#ffffff', '#9a8f86', 0.9));
+    const key = new THREE.DirectionalLight('#fff4e8', 2.4); key.position.set(-2.5, 3, 5); scene.add(key);
+    const rim = new THREE.DirectionalLight('#dfe8ff', 1.6); rim.position.set(3, 2, -3); scene.add(rim);
     const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 50);
     pr = { renderer, scene, cam };
     return pr;

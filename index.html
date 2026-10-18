@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Japa Simulator: London Hustle</title>
-  <meta name="description" content="A free 3D browser life sim about surviving London. Start as a fresh japa, Old Money or New Gen and hustle your way through 60 days.">
-  <meta property="og:title" content="Japa Simulator: London Hustle">
+  <title>London Hustle</title>
+  <meta name="description" content="A free 3D browser life sim about surviving London. Start as a Fresh Immigrant, Old Money or New Gen and hustle your way through 60 days.">
+  <meta property="og:title" content="London Hustle">
   <meta property="og:description" content="Can you survive 60 days in London? Tube strikes, rent hikes, Owambe parties and visa deadlines.">
   <meta name="theme-color" content="#cfe0b4">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👑</text></svg>">
@@ -21,7 +21,7 @@
 
   <section id="title" class="screen">
     <header class="topbar">
-      <div class="pill brand"><span class="crown">👑</span><b>London Hustle</b><span class="live"><i class="dot"></i>Japa Simulator</span></div>
+      <div class="pill brand"><span class="crown">👑</span><b>London Hustle</b><span class="live"><i class="dot"></i>London life sim</span></div>
     </header>
     <div class="card title-card">
       <h1>Live your London story</h1>
@@ -61,10 +61,14 @@
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div id="modal-card" class="modal-card"></div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="js/data.js"></script>
-  <script src="js/avatar.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/world.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="js/boot.js"></script>
 </body>
 </html>

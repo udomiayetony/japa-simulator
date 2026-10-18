@@ -15,6 +15,9 @@ const World = (() => {
 
   let renderer, scene, camera, root, pinLayer;
   let hemi, sun, rain = null, rainOn = false;
+  let composer = null, bloomPass = null, quality = 'high', nightLevel = 0;
+  const clouds = [];
+  const nightMats = [];
   const target = new THREE.Vector3(0, 0, 0);
   let dist = 110, goalTarget = null, goalDist = null;
   let attract = false, attractT = 0;
@@ -36,15 +39,19 @@ const World = (() => {
   const mats = {};
   function mat(color, opts = {}) {
     const key = color + JSON.stringify(opts);
-    if (!mats[key]) mats[key] = new THREE.MeshLambertMaterial({ color, ...opts });
+    if (!mats[key]) mats[key] = new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...opts });
     return mats[key];
   }
+  // Reflective glass for the skyscrapers.
+  const glass = (color) => mat(color, { roughness: 0.08, metalness: 0.7 });
+  const WATER = () => mat('#3a8fd6', { roughness: 0.06, metalness: 0.3 });
   function canvasTex(w, h, draw) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     draw(c.getContext('2d'), w, h);
     const t = new THREE.CanvasTexture(c);
     t.anisotropy = 4;
+    t.colorSpace = THREE.SRGBColorSpace;
     return t;
   }
   const windowTex = canvasTex(64, 64, (g) => {
@@ -53,6 +60,16 @@ const World = (() => {
     g.fillStyle = '#8fa3bd'; g.fillRect(12, 10, 18, 34);
   });
   windowTex.wrapS = windowTex.wrapT = THREE.RepeatWrapping;
+  // Night lights: a 4x4 block of windows with some lit, used as an emissive map.
+  const litTex = canvasTex(64, 64, (g) => {
+    g.fillStyle = '#000000'; g.fillRect(0, 0, 64, 64);
+    let seed = 5;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+      seed = (seed * 16807) % 2147483647;
+      if (seed % 10 < 5) { g.fillStyle = seed % 3 ? '#ffd27a' : '#fff1c9'; g.fillRect(i * 16 + 3, j * 16 + 2, 10, 9); }
+    }
+  });
+  litTex.wrapS = litTex.wrapT = THREE.RepeatWrapping;
   const winMats = {};
   function winMat(color, rx, ry) {
     const key = `${color}|${rx}|${ry}`;
@@ -60,7 +77,11 @@ const World = (() => {
       const t = windowTex.clone();
       t.needsUpdate = true;
       t.repeat.set(rx, ry);
-      winMats[key] = new THREE.MeshLambertMaterial({ color, map: t });
+      const e = litTex.clone();
+      e.needsUpdate = true;
+      e.repeat.set(rx / 4, ry / 4);
+      winMats[key] = new THREE.MeshStandardMaterial({ color, map: t, roughness: 0.7, metalness: 0.05, emissive: '#ffc46b', emissiveMap: e, emissiveIntensity: 0 });
+      nightMats.push(winMats[key]);
     }
     return winMats[key];
   }
@@ -69,6 +90,7 @@ const World = (() => {
     const m = new THREE.Mesh(BOX, typeof color === 'string' ? mat(color) : color);
     m.scale.set(w, h, d);
     m.position.set(x, y + h / 2, z);
+    if (h <= 0.15) m.userData.flat = true;
     parent.add(m);
     return m;
   }
@@ -144,6 +166,8 @@ const World = (() => {
     m.rotation.x = -Math.PI / 2;
     m.rotation.z = rot;
     m.position.set(x, 0.14, z);
+    m.userData.flat = true;
+    m.userData.noShadow = true;
     root.add(m);
   }
 
@@ -171,7 +195,7 @@ const World = (() => {
     return m;
   }
   function ribbon(points, width, color, y) {
-    const m = mat(color);
+    const m = typeof color === 'string' ? mat(color) : color;
     const jointGeo = new THREE.CylinderGeometry(width / 2, width / 2, 0.1, 18);
     for (let i = 0; i < points.length - 1; i++) {
       const [ax, az] = points[i], [bx, bz] = points[i + 1];
@@ -179,9 +203,11 @@ const World = (() => {
       seg.scale.set(width, 0.1, Math.hypot(bx - ax, bz - az));
       seg.position.set((ax + bx) / 2, y, (az + bz) / 2);
       seg.rotation.y = Math.atan2(bx - ax, bz - az);
+      seg.userData.flat = true;
       root.add(seg);
       const joint = new THREE.Mesh(jointGeo, m);
       joint.position.set(bx, y, bz);
+      joint.userData.flat = true;
       root.add(joint);
     }
   }
@@ -207,15 +233,17 @@ const World = (() => {
       const [x, z] = at(p.lat, p.lon);
       const k = kAt(p.lat, p.lon);
       const rx = p.rx * KM * k, rz = p.rz * KM * k;
-      const lawn = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 40), mat('#9fd27a'));
+      const lawn = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 40), mat('#78b94e', { roughness: 0.95 }));
       lawn.scale.set(rx, 1, rz);
       lawn.position.set(x, 0.05, z);
       lawn.rotation.y = p.rot || 0;
+      lawn.userData.flat = true;
       root.add(lawn);
       parkShapes.push({ x, z, rx, rz, rot: p.rot || 0 });
       if (p.lake) {
         const [lx, lz, lrx, lrz, lr] = p.lake;
-        const lake = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 30), mat('#4f9fd8'));
+        const lake = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 30), WATER());
+        lake.userData.flat = true;
         lake.scale.set(lrx * KM * k, 1, lrz * KM * k);
         lake.position.set(x + lx * KM * k, 0.1, z + lz * KM * k);
         lake.rotation.y = lr;
@@ -226,6 +254,7 @@ const World = (() => {
       path.scale.set(rx * 1.7, 0.1, 0.45);
       path.position.set(x, 0.09, z);
       path.rotation.y = (p.rot || 0) + 0.35;
+      path.userData.flat = true;
       root.add(path);
       flatLabel(p.name.toUpperCase(), x, z + rz * 0.55, Math.min(1.4, rx / 6), 0, 'rgba(60,110,50,.55)');
     }
@@ -251,7 +280,7 @@ const World = (() => {
         seen.add(key);
         EDGES.push([a, b]);
         const A = LOCATIONS[a], B = LOCATIONS[b];
-        ribbon([[wx(A.x), wz(A.y)], [wx(B.x), wz(B.y)]], 1.25, '#a3a8ad', 0.12);
+        ribbon([[wx(A.x), wz(A.y)], [wx(B.x), wz(B.y)]], 1.25, '#7d848b', 0.12);
       }
     }
   }
@@ -330,7 +359,7 @@ const World = (() => {
       plot(g, 9, 7);
       const cols = ['#e63946', '#f4a261', '#2a9d8f', '#e9c46a', '#6c4ab6', '#1d9bf0', '#ff70a6', '#70d6ff'];
       for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) box(g, 1.6, 0.5, 1.4, cols[(r * 4 + c) % 8], -3.3 + c * 2.2, 0.05, -2 + r * 1.8);
-      box(g, 9, 0.08, 1.1, '#4f9fd8', 0, 0.06, 3.1);
+      box(g, 9, 0.08, 1.1, WATER(), 0, 0.06, 3.1);
       box(g, 2.4, 0.5, 0.7, '#2d6a4f', 1.5, 0.1, 3.1);
     },
     kingscross(g) {
@@ -383,8 +412,8 @@ const World = (() => {
     },
     canary(g) {
       plot(g, 10, 8, '#dfe4e8');
-      building(g, 2.6, 13, 2.6, '#b8c7d4', 0, -1);
-      cone(g, 1.85, 2.1, '#dfe6ec', 0, 13.1, -1, 4);
+      box(g, 2.6, 13, 2.6, glass('#b4c8d8'), 0, 0, -1);
+      cone(g, 1.85, 2.1, '#dfe6ec', 0, 13, -1, 4);
       building(g, 2.2, 10, 2.2, '#8faabf', -3.2, 1);
       building(g, 2.2, 9.5, 2.4, '#a9bccb', 3.2, 1.2);
       building(g, 1.9, 7, 1.9, '#6f8ea8', 3.3, -2.6);
@@ -551,7 +580,7 @@ const World = (() => {
       box(g, 1, 5, 1, '#7c4a3a', 0, 0, 0.2);
     } },
     { name: 'The Shard', lat: 51.5045, lon: -0.0865, r: 2.5, build(g) {
-      const s = new THREE.Mesh(new THREE.ConeGeometry(2.1, 16, 4), mat('#a7c4d8'));
+      const s = new THREE.Mesh(new THREE.ConeGeometry(2.1, 16, 4), glass('#9fc0dc'));
       s.position.y = 8; s.rotation.y = Math.PI / 4; g.add(s);
     } },
     { name: 'Tower Bridge', lat: 51.5055, lon: -0.0754, r: 0, rot: -0.05, build(g) {
@@ -566,15 +595,15 @@ const World = (() => {
     { name: 'The Gherkin', lat: 51.5145, lon: -0.0803, r: 2, build(g) {
       const pts = [];
       for (let i = 0; i <= 14; i++) { const t = i / 14; pts.push(new THREE.Vector2(Math.sin(Math.PI * (0.12 + t * 0.88)) * 1.5 * (1 - t * 0.15), t * 9)); }
-      g.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 18), mat('#4f7f8f')));
+      g.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 18), glass('#3f7486')));
     } },
     { name: 'Walkie-Talkie', lat: 51.5113, lon: -0.0836, r: 2, build(g) {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.15, 8, 4), mat('#7a9bb3'));
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.15, 8, 4), glass('#7f9fba'));
       m.position.y = 4; m.rotation.y = Math.PI / 4; m.scale.set(1, 1, 0.75); g.add(m);
     } },
     { name: 'The Cheesegrater', lat: 51.5138, lon: -0.0826, r: 2, build(g) {
       const geo = new THREE.CylinderGeometry(0.4, 1.8, 10, 4, 1);
-      const m = new THREE.Mesh(geo, mat('#9fb6c8'));
+      const m = new THREE.Mesh(geo, glass('#a5bccd'));
       m.position.y = 5; m.rotation.y = Math.PI / 4; m.scale.set(1, 1, 0.55); g.add(m);
     } },
     { name: 'The O2', lat: 51.5030, lon: 0.0032, r: 4, build(g) {
@@ -637,7 +666,7 @@ const World = (() => {
       building(g, 2.4, 1, 1, '#bcd4e6', 0, -1.4);
     } },
     { name: 'Westfield White City', lat: 51.5072, lon: -0.2219, r: 2.5, build(g) { building(g, 4, 1.6, 2.4, '#cfd8de', 0, 0, '#9aa8b2'); } },
-    { name: 'King George V Dock', lat: 51.5025, lon: 0.0650, r: 0, build(g) { box(g, 10, 0.09, 1.6, '#4f9fd8', 0, 0.02, 0); } },
+    { name: 'King George V Dock', lat: 51.5025, lon: 0.0650, r: 0, build(g) { box(g, 10, 0.09, 1.6, WATER(), 0, 0.02, 0); } },
   ];
 
   function buildMonuments() {
@@ -832,12 +861,35 @@ const World = (() => {
     }
   }
 
+  // ------------------------------------------------------------ clouds (only their shadows show)
+
+  function makeClouds() {
+    const m = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    const geo = new THREE.IcosahedronGeometry(1, 1);
+    for (let i = 0; i < 14; i++) {
+      const c = new THREE.Group();
+      for (let k = 0; k < 5; k++) {
+        const puff = new THREE.Mesh(geo, m);
+        puff.scale.set(6 + (k % 3) * 2, 2.5, 5 + (k % 2) * 2);
+        puff.position.set((k - 2) * 5, (k % 2) * 1.2, ((k * 7) % 5) - 2);
+        puff.castShadow = true;
+        puff.userData.cloud = true;
+        c.add(puff);
+      }
+      c.position.set(-200 + i * 31, 34, -120 + ((i * 53) % 240));
+      c.userData.speed = 1.2 + (i % 4) * 0.4;
+      scene.add(c);
+      clouds.push(c);
+    }
+  }
+
   // ------------------------------------------------------------ the player
 
   function makeAvatar(look) {
     const g = new THREE.Group();
     const model = Avatar.build(look, 'full');
     model.position.y = 3.8;
+    model.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     g.add(model);
     const ring = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.75, 32), new THREE.MeshBasicMaterial({ color: '#20b26b', transparent: true, opacity: 0.9 }));
     ring.rotation.x = -Math.PI / 2;
@@ -899,6 +951,21 @@ const World = (() => {
   }
 
   // ------------------------------------------------------------ camera & input
+
+  let shadowSize = 0;
+  function updateSun() {
+    const off = new THREE.Vector3(-0.5, 1, 0.38).normalize().multiplyScalar(160);
+    sun.position.copy(target).add(off);
+    sun.target.position.copy(target);
+    const size = Math.round(Math.max(30, Math.min(170, dist * 0.85)) / 5) * 5;
+    if (size !== shadowSize) {
+      shadowSize = size;
+      const c = sun.shadow.camera;
+      c.left = -size; c.right = size; c.top = size; c.bottom = -size;
+      c.near = 20; c.far = 360;
+      c.updateProjectionMatrix();
+    }
+  }
 
   function updateCamera() {
     camera.position.set(target.x, target.y + Math.sin(PITCH) * dist, target.z + Math.cos(PITCH) * dist);
@@ -970,18 +1037,23 @@ const World = (() => {
     rain.visible = false;
     scene.add(rain);
   }
-  const DAY_BG = new THREE.Color('#c9dcb5'), NIGHT_BG = new THREE.Color('#1c2a44');
+  const DAY_BG = new THREE.Color('#a9c98a'), NIGHT_BG = new THREE.Color('#1c2a44');
   function setTime(hourFloat, weather) {
     let light;
     if (hourFloat >= 7 && hourFloat < 18) light = 1;
     else if (hourFloat >= 5 && hourFloat < 7) light = 0.35 + (hourFloat - 5) * 0.325;
     else if (hourFloat >= 18 && hourFloat < 21) light = 1 - (hourFloat - 18) * 0.22;
-    else light = 0.32;
-    const grey = weather === 'rain' || weather === 'grey' ? 0.85 : 1;
-    hemi.intensity = 0.32 + 0.33 * light * grey;
-    sun.intensity = 0.12 + 0.5 * light * grey;
+    else light = 0.16;
+    const grey = weather === 'rain' || weather === 'grey' ? 0.8 : 1;
+    hemi.intensity = 0.25 + 0.45 * light * grey;
+    sun.intensity = 0.15 + 3.1 * light * grey;
+    sun.color.set(light < 0.75 ? '#ffc58f' : '#fff3e2');
+    scene.environmentIntensity = 0.15 + 0.35 * light;
     scene.background = NIGHT_BG.clone().lerp(DAY_BG, light);
     scene.fog.color.copy(scene.background);
+    nightLevel = Math.max(0, Math.min(1, (0.85 - light) / 0.5));
+    for (const m of nightMats) m.emissiveIntensity = nightLevel * 1.6;
+    if (bloomPass) bloomPass.strength = 0.12 + nightLevel * 0.55;
     rainOn = weather === 'rain';
     if (rain) rain.visible = rainOn;
   }
@@ -999,6 +1071,12 @@ const World = (() => {
     if (goalTarget) { target.lerp(goalTarget, Math.min(1, dt * 4)); if (target.distanceTo(goalTarget) < 0.05) goalTarget = null; }
     if (goalDist) { dist += (goalDist - dist) * Math.min(1, dt * 4); if (Math.abs(goalDist - dist) < 0.1) goalDist = null; }
     updateCamera();
+    updateSun();
+    for (const c of clouds) {
+      c.position.x += c.userData.speed * dt * 3;
+      if (c.position.x > target.x + 220) c.position.x = target.x - 220;
+      if (c.position.x < target.x - 220) c.position.x = target.x + 220;
+    }
     tickTraffic(dt);
     for (const s of spinners) s.rotation.z += dt * 0.06;
     if (avatar) {
@@ -1020,7 +1098,7 @@ const World = (() => {
       pos.needsUpdate = true;
       rain.position.set(target.x, 0, target.z);
     }
-    renderer.render(scene, camera);
+    if (composer) composer.render(dt); else renderer.render(scene, camera);
     placePins();
     requestAnimationFrame(frame);
   }
@@ -1029,6 +1107,61 @@ const World = (() => {
     renderer.setSize(el.clientWidth, el.clientHeight, false);
     camera.aspect = el.clientWidth / el.clientHeight;
     camera.updateProjectionMatrix();
+    if (composer) composer.setSize(el.clientWidth, el.clientHeight);
+  }
+
+  // ------------------------------------------------------------ graphics quality
+
+  const QUALITY_KEY = 'london-hustle-graphics';
+  function defaultQuality() {
+    const phone = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    return phone || window.innerWidth < 760 ? 'medium' : 'high';
+  }
+  // high: shadows, ambient occlusion and bloom. medium: shadows and bloom. low: none.
+  function applyQuality(q) {
+    quality = q;
+    const dpr = window.devicePixelRatio || 1;
+    renderer.setPixelRatio(q === 'high' ? Math.min(dpr, 2) : q === 'medium' ? Math.min(dpr, 1.5) : 1);
+    renderer.shadowMap.enabled = q !== 'low';
+    sun.castShadow = q !== 'low';
+    sun.shadow.mapSize.set(q === 'high' ? 2048 : 1024, q === 'high' ? 2048 : 1024);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+    composer = null; bloomPass = null;
+    const el = renderer.domElement.parentElement;
+    const w = el.clientWidth, h = el.clientHeight;
+    if (q !== 'low') {
+      composer = new FX.EffectComposer(renderer);
+      composer.addPass(new FX.RenderPass(scene, camera));
+      if (q === 'high') {
+        const ao = new FX.GTAOPass(scene, camera, w, h);
+        ao.blendIntensity = 0.85;
+        composer.addPass(ao);
+      }
+      bloomPass = new FX.UnrealBloomPass(new THREE.Vector2(w, h), 0.12 + nightLevel * 0.55, 0.55, 0.86);
+      composer.addPass(bloomPass);
+      composer.addPass(new FX.OutputPass());
+    }
+    resize();
+    // Materials compile differently with and without shadows
+    root.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
+  }
+
+  // A sky scene used to light and reflect the city (water and glass pick it up).
+  function skyEnvironment() {
+    const sky = new THREE.Scene();
+    const tex = canvasTex(16, 256, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, '#5f9ee8'); gr.addColorStop(0.48, '#bcd9f4'); gr.addColorStop(0.52, '#e9e4d6'); gr.addColorStop(1, '#8a9a7a');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    });
+    sky.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide })));
+    const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 5.6, 4.8) }));
+    sunDisc.position.set(-22, 34, 16);
+    sky.add(sunDisc);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const env = pmrem.fromScene(sky, 0.02).texture;
+    pmrem.dispose();
+    return env;
   }
 
   // ------------------------------------------------------------ public API
@@ -1036,26 +1169,31 @@ const World = (() => {
   return {
     init(container, pinContainer) {
       pinLayer = pinContainer;
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.domElement.className = 'world-canvas';
       container.appendChild(renderer.domElement);
       scene = new THREE.Scene();
       scene.background = DAY_BG.clone();
       scene.fog = new THREE.Fog(DAY_BG.clone(), 260, 620);
       camera = new THREE.PerspectiveCamera(FOV, 1, 1, 900);
-      hemi = new THREE.HemisphereLight('#ffffff', '#8aa27a', 0.6);
-      sun = new THREE.DirectionalLight('#fff6e8', 0.6);
-      sun.position.set(-40, 80, 30);
-      scene.add(hemi, sun);
+      scene.environment = skyEnvironment();
+      hemi = new THREE.HemisphereLight('#dfefff', '#7f9a68', 1.0);
+      sun = new THREE.DirectionalLight('#fff3e2', 2.6);
+      sun.shadow.bias = -0.0005;
+      sun.shadow.normalBias = 0.04;
+      scene.add(hemi, sun, sun.target);
       root = new THREE.Group();
       scene.add(root);
 
-      const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1000), mat('#bcd59a'));
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1000), mat('#97c06c', { roughness: 0.95 }));
       ground.rotation.x = -Math.PI / 2;
       root.add(ground);
-      ribbon(THAMES, RIVER_W + 1.4, '#e6dcc0', 0.03);
-      ribbon(THAMES, RIVER_W, '#4f9fd8', 0.07);
+      ribbon(THAMES, RIVER_W + 1.4, '#cdbf98', 0.03);
+      ribbon(THAMES, RIVER_W, WATER(), 0.07);
       buildParks();
       buildRoads();
       for (const id of Object.keys(LOCATIONS)) {
@@ -1084,10 +1222,19 @@ const World = (() => {
       flatLabel('WEST LONDON', ...at(51.5100, -0.2700), 2.4, 0, 'rgba(90,110,80,.45)');
       spawnTraffic();
       makeRain();
+      makeClouds();
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        o.receiveShadow = !o.userData.noShadow;
+        o.castShadow = !o.userData.flat && !o.userData.noShadow;
+      });
+      ground.castShadow = false;
       makePins();
       bindInput(renderer.domElement);
       window.addEventListener('resize', resize);
-      resize();
+      let saved = null;
+      try { saved = localStorage.getItem(QUALITY_KEY); } catch (e) { saved = null; }
+      applyQuality(['high', 'medium', 'low'].includes(saved) ? saved : defaultQuality());
       setTime(12, 'sun');
       requestAnimationFrame(frame);
     },
@@ -1116,6 +1263,11 @@ const World = (() => {
       if (zoom) goalDist = zoom;
     },
     setTime,
+    getQuality: () => quality,
+    setQuality(q) {
+      try { localStorage.setItem(QUALITY_KEY, q); } catch (e) { /* storage unavailable */ }
+      applyQuality(q);
+    },
     // Point the camera at a real-world spot (used for screenshots and tests).
     lookAt(lat, lon, d) { const [x, z] = at(lat, lon); goalTarget = new THREE.Vector3(x, 0, z); if (d) goalDist = d; },
     markPins(here, home, selected) {

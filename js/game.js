@@ -1,5 +1,5 @@
 'use strict';
-// Japa Simulator: London Hustle — game engine, UI and save system.
+// London Hustle: game engine, UI and save system.
 
 const SAVE_KEY = 'japa-london-save-v1';
 const GAME_DAYS = 60;
@@ -347,7 +347,7 @@ function workShift(hrs) {
 // ---------------------------------------------------------------- NPC perks
 
 const PERKS = {
-  chidi30: { npc: 'chidi', at: 30, text: '🧑🏿 Chidi: "That care home in Croydon dey sponsor visa o. Tell them say na me send you." (Care job interview is now guaranteed.)' },
+  chidi30: { npc: 'chidi', at: 30, text: '🧑🏿 Chidi: "That care home in Croydon sponsors visas. Tell them I sent you." (Care job interview is now guaranteed.)' },
   chidi60: { npc: 'chidi', at: 60, run: () => { if (S.home === 'woolwich') { S.rent -= 25; return '🧑🏿 Chidi found you a cheaper room on the same street. Rent -£25/week!'; } return '🧑🏿 Chidi sent you home with a cooler of jollof and £100 "for transport".' + fx({ money: 100, hunger: 40 }); } },
   jade30: { npc: 'jade', at: 30, text: '👩🏾 Jade sorted you a pitch at her mate\'s Camden stall. Market earnings boosted!' },
   jade60: { npc: 'jade', at: 60, run: () => '👩🏾 Jade cut you in on a vintage reselling flip.' + fx({ money: 250, hustle: 4 }) },
@@ -361,7 +361,7 @@ function hangOut(id) {
   const npc = NPCS[id];
   S.rel[id] = clamp(S.rel[id] + 12 + Math.round(S.skills.charm / 15));
   const lines = {
-    chidi: ['Chidi showed you which Woolwich shops sell real Nigerian pepper.', 'You and Chidi argued about Arsenal for two hours.', 'Chidi shared his japa war stories.'],
+    chidi: ['Chidi showed you which Woolwich shops sell real Nigerian pepper.', 'You and Chidi argued about Arsenal for two hours.', 'Chidi told you how he arrived with one suitcase and built a business.'],
     jade: ['Jade did your nails while spilling all the Peckham gossip.', 'You and Jade went thrifting on Rye Lane.', 'Jade taught you the 12 bus route by heart.'],
     tom: ['Tom took you to his members\' club. The sandwiches had no crusts.', 'Tom confessed he\'s never been to Zone 3.', 'You taught Tom what "wagwan" means.'],
     priya: ['Priya reviewed your CV and deleted half of it.', 'You went to Priya\'s DJ set in a converted warehouse.', 'Priya explained what a "Series A" is. Twice.'],
@@ -401,7 +401,7 @@ function placeActions(loc) {
     }));
     A.push(act('📺 Watch telly', { mins: 120, run: () => '📺 ' + pick(['Binged Top Boy.', 'Watched Bake Off. Cried a little.', 'Watched Nollywood on YouTube.', 'Watched Love Island and judged everyone.']) + fx({ fun: 22, energy: 5 }) }));
     if (S.bg === 'immigrant') {
-      A.push(act('📞 Call home', { mins: 60, run: () => '📞 Mummy asked if you\'ve "seen the Queen\'s son yet". ' + fx({ social: 22, family: 6, fun: 6 }) }));
+      A.push(act('📞 Call home', { mins: 60, run: () => '📞 Your mum asked if you\'ve met the King yet. ' + fx({ social: 22, family: 6, fun: 6 }) }));
       A.push(act('💸 Send £100 home', { mins: 10, cost: 100, run: () => { S.stats.sentHome += 100; return '💸 Sent £100 home. The family group chat is full of prayers for you.' + fx({ family: 15, fun: 5 }); } }));
     } else {
       A.push(act('💬 Group chat', { mins: 45, run: () => '💬 ' + pick(['The group chat roasted your new haircut.', 'Someone posted a voice note longer than a podcast.', 'Planned a holiday you will never go on.']) + fx({ social: 15, fun: 5 }) }));
@@ -431,10 +431,10 @@ function placeActions(loc) {
     if (j.place !== loc) continue;
     if (S.job === id) {
       let cap = null;
-      if (S.visa && S.visa.type === 'student') cap = 20 - S.weekHours;
+      if (S.visa && S.visa.type === 'student') cap = 20 - S.weekHours; // 'student' is the starter visa
       const shiftOk = openBetween(5, 22) ? null : 'Shifts run 5am to 10pm';
       for (const hrs of id === 'analyst' ? [8, 12] : [4, 8]) {
-        const capMsg = cap !== null && hrs > cap ? `Student visa: max 20h/week (${cap}h left)` : null;
+        const capMsg = cap !== null && hrs > cap ? `Starter visa: max 20h/week (${cap}h left)` : null;
         A.push(act(`💼 Work ${hrs}h shift`, { mins: hrs * 60, disabled: shiftOk || capMsg, sub: `~${money(Math.round(j.pay * hrs))}`, run: () => workShift(hrs) }));
       }
     } else {
@@ -456,7 +456,7 @@ function placeActions(loc) {
   const specials = {
     heathrow: [
       S.bg === 'immigrant'
-        ? act('🇳🇬 Fly to Lagos for 3 days', { mins: 4320, cost: 850, run: () => '🇳🇬 Home! Mummy cooked everything. Everyone asked when you\'re building a house.' + fx({ social: 60, fun: 60, family: 30, energy: 20 }) })
+        ? act(`✈️ Fly home to ${countryName(S.country)} for 3 days`, { mins: 4320, cost: 850, run: () => `✈️ Home to ${countryName(S.country)} ${flagOf(S.country)}! The family cooked everything.`+' Everyone asked when you\'re buying a house.' + fx({ social: 60, fun: 60, family: 30, energy: 20 }) })
         : act('🏝️ Weekend in Ibiza', { mins: 2880, cost: 450, run: () => '🏝️ Two days in Ibiza. Your bank account is crying, you are not.' + fx({ fun: 70, social: 40, energy: -20 }) }),
       act('✈️ Plane spotting', { mins: 60, run: () => '✈️ Watched planes land. Remembered why you came.' + fx({ fun: 8 }) }),
     ],
@@ -643,8 +643,8 @@ function afterAction() {
 const EVENTS = {
   strike: { title: '🚇 Tube strike!', text: 'The RMT has called a strike. No Tube today. Buses will be rammed and everyone will be late.', choices: [{ label: 'Typical. Bus it is.', run: () => '' }] },
   heatwave: { title: '🥵 Heatwave', text: '33°C. The Central line is hotter than the legal limit for transporting cattle. Nobody in London owns a fan.', choices: [{ label: 'Suffer in silence', run: () => fx({ energy: -10, hygiene: -10 }) }] },
-  chidiHello: { title: '📱 WhatsApp from Chidi', text: '"Welcome to London my guy! Come to Woolwich, I go show you road. Rule one: always stand on the right."', choices: [{ label: 'On my way!', run: () => fx({ social: 10, fun: 5 }) }] },
-  visaWarn: { title: '🛂 Home Office letter', text: 'Your student visa expires on day 35. If you\'re not on a Skilled Worker visa by then, you\'re going home. Get a job that sponsors visas, then apply at Lunar House in Croydon.', choices: [{ label: 'No pressure then 😬', run: () => fx({ fun: -5 }) }] },
+  chidiHello: { title: '📱 WhatsApp from Chidi', text: '"Welcome to London! I came here six years ago with one suitcase too. Come to Woolwich and I\'ll show you around. Rule one: always stand on the right."', choices: [{ label: 'On my way!', run: () => fx({ social: 10, fun: 5 }) }] },
+  visaWarn: { title: '🛂 Home Office letter', text: 'Your starter visa expires on day 35. If you\'re not on a Skilled Worker visa by then, you\'re going home. Get a job that sponsors visas, then apply at Lunar House in Croydon.', choices: [{ label: 'No pressure then 😬', run: () => fx({ fun: -5 }) }] },
   paterCall: { title: '📞 Pater calls', text: '"I\'ve spoken to your mother. We\'re worried you have no ambition. Show us you can stand on your own two feet."', choices: [{ label: '"Yes, Pater."', run: () => '' }, { label: '"I\'m literally an influencer."', run: () => fx({ fun: 5, family: -10 }) }] },
   cutOff: {
     title: '💀 Cut off', text: 'Pater has had enough. "No more allowance. I\'ll pay half the Chelsea rent and not a penny more. It\'s time you worked."',
@@ -662,7 +662,7 @@ const RANDOM_EVENTS = {
     ],
   },
   mumMoney: {
-    cond: () => S.bg === 'immigrant', title: '📞 Mummy calls', text: '"Your brother\'s school fees are due. Just £100 small. God will bless you."',
+    cond: () => S.bg === 'immigrant', title: '📞 Family calls', text: '"Your brother\'s school fees are due. Just £100. We are so proud of you."',
     choices: [
       { label: 'Send £100', cost: 100, run: () => { S.stats.sentHome += 100; return fx({ money: -100, family: 15, social: 10 }); } },
       { label: 'Say you\'re broke', run: () => fx({ family: -12, fun: -10 }) },
@@ -767,7 +767,7 @@ function goalMet() {
 function goalProgress() {
   if (S.bg === 'immigrant') {
     return [
-      { label: S.visa.type === 'skilled' ? 'Skilled Worker visa ✅' : `Student visa: ${Math.max(0, S.visa.expires - day())} days left`, pct: S.visa.type === 'skilled' ? 100 : 0 },
+      { label: S.visa.type === 'skilled' ? 'Skilled Worker visa ✅' : `Starter visa: ${Math.max(0, S.visa.expires - day())} days left`, pct: S.visa.type === 'skilled' ? 100 : 0 },
       { label: `Savings ${money(Math.max(0, S.money))} / £3,000`, pct: clamp(S.money / 30) },
     ];
   }
@@ -795,11 +795,11 @@ function endGame(kind) {
 
 function endingText() {
   const o = S.over;
-  if (o.kind === 'deported') return ['Back to Lagos 🇳🇬', 'Your student visa ran out before you found a sponsor. Mummy is happy to see you, at least. The japa dream continues... next year.'];
+  if (o.kind === 'deported') return ['Flying Home ✈️', `Your starter visa ran out before you found a sponsor. Your family in ${countryName(S.country)} is happy to see you, and you are already planning the comeback.`];
   if (o.kind === 'evicted') return ['Evicted 📦', 'Two weeks deep in your overdraft and the landlord changed the locks. London is not for the faint-hearted.'];
   if (o.win) {
     return {
-      immigrant: ['Indefinite Leave to Hustle 🇬🇧', 'Skilled Worker visa, savings in the bank and a family back home who brag about you at every party. You made the japa work.'],
+      immigrant: ['Indefinite Leave to Hustle 🇬🇧', 'Skilled Worker visa, savings in the bank and a family back home who brag about you at every party. You made London work.'],
       oldmoney: ['Self-Made (Mostly) 🎩', 'Pater actually said "well done" at Sunday lunch. You\'ll never let anyone forget you had a job.'],
       newgen: ['Debt-Free in the Ends 🔑', 'QuickCash is a memory and you\'ve got a deposit saved. Peckham\'s finest is going places.'],
     }[S.bg];
@@ -825,11 +825,11 @@ function showEnd() {
   const [head, body] = endingText();
   const sc = score();
   const g = grade(sc);
-  const share = `I played Japa Simulator: London Hustle as ${BACKGROUNDS[S.bg].name} and got "${head}" (grade ${g}). ${S.stats.tubeTrips} Tube rides, ${S.stats.pints} pints, net worth ${money(netWorth())}. Can you survive London?`;
+  const share = `I played London Hustle as a ${flagOf(S.country)} ${BACKGROUNDS[S.bg].name} and got "${head}" (grade ${g}). ${S.stats.tubeTrips} Tube rides, ${S.stats.pints} pints, net worth ${money(netWorth())}. Can you survive London?`;
   openModal(`
     <div class="end">
       <div class="end-avatar"><img class="avatar-img" src="${Avatar.portrait(S.look)}" alt=""></div>
-      <p class="eyebrow">Day ${S.over.day} · ${esc(BACKGROUNDS[S.bg].name)}</p>
+      <p class="eyebrow">Day ${S.over.day} · ${flagOf(S.country)} ${esc(BACKGROUNDS[S.bg].name)}</p>
       <h2>${esc(head)}</h2>
       <p>${esc(body)}</p>
       <div class="grade">Grade <b>${g}</b><span>${sc.toLocaleString()} pts</span></div>
@@ -885,7 +885,7 @@ function render() {
     `💼 ${esc(jobTitle())}`,
   ];
   if (S.debt > 0) chips.push(`💳 Debt ${money(S.debt)}`);
-  if (S.visa) chips.push(S.visa.type === 'student' ? `🛂 Visa: ${Math.max(0, S.visa.expires - day())} days` : '🛂 Skilled Worker ✅');
+  if (S.visa) chips.push(S.visa.type === 'student' ? `🛂 Starter visa: ${Math.max(0, S.visa.expires - day())} days` : '🛂 Skilled Worker ✅');
   if (S.strike) chips.push('🚇 Tube strike');
   $('#chips').innerHTML = chips.map((c) => `<span class="pill chip">${c}</span>`).join('');
   const last = S.log[0];
@@ -894,7 +894,7 @@ function render() {
 
   const [mEmoji, mText] = moodLabel(mood());
   $('#dock').innerHTML = `
-    <button class="me-chip" id="meChip" aria-label="Your stats"><img class="avatar-img" src="${Avatar.portrait(S.look)}" alt=""><span><b>${esc(S.name)}</b><small>${mEmoji} ${mText}</small></span></button>
+    <button class="me-chip" id="meChip" aria-label="Your stats"><img class="avatar-img" src="${Avatar.portrait(S.look)}" alt=""><span><b>${flagOf(S.country)} ${esc(S.name)}</b><small>${mEmoji} ${mText}</small></span></button>
     <div class="rings">${Object.keys(S.needs).map((k) => {
       const v = Math.round(S.needs[k]);
       const col = v < 25 ? 'var(--bad)' : v < 50 ? 'var(--amber)' : 'var(--green)';
@@ -1042,6 +1042,11 @@ function showMenu() {
   openModal(`
     <h2>Menu</h2>
     <p>Your game saves automatically in this browser.</p>
+    <h4 class="menu-label">Graphics</h4>
+    <div class="segmented" role="group" aria-label="Graphics quality">
+      ${['high', 'medium', 'low'].map((q) => `<button class="${World.getQuality() === q ? 'on' : ''}" data-quality="${q}">${{ high: 'High', medium: 'Medium', low: 'Low' }[q]}</button>`).join('')}
+    </div>
+    <p class="hint">High adds soft shadows, ambient occlusion and glow. Use Low if your phone gets hot or slow.</p>
     <div class="choices vertical">
       <button class="btn primary" data-close>Resume</button>
       <button class="btn" id="howBtn">How to play</button>
@@ -1049,6 +1054,13 @@ function showMenu() {
       <button class="btn danger" id="restartBtn">Start a new life</button>
     </div>`);
   $('[data-close]').onclick = () => { closeModal(); processQueue(); };
+  document.querySelectorAll('[data-quality]').forEach((btn) => {
+    btn.onclick = () => {
+      World.setQuality(btn.dataset.quality);
+      document.querySelectorAll('[data-quality]').forEach((x) => x.classList.toggle('on', x === btn));
+      toast(`Graphics set to ${btn.textContent}`);
+    };
+  });
   $('#howBtn').onclick = showHelp;
   $('#titleBtn').onclick = () => { closeModal(); showTitle(); };
   $('#restartBtn').onclick = (e) => {
@@ -1083,7 +1095,7 @@ function showTitle() {
   showScreen('title');
 }
 
-const create = { name: '', bg: 'immigrant', look: { skin: 5, hair: 2, hairColour: 0, outfit: 0, head: 0, hatColour: 0, eyewear: 0, facial: 0, earrings: 0 } };
+const create = { name: '', bg: 'immigrant', country: null, countrySearch: '', look: { skin: 5, hair: 2, hairColour: 0, outfit: 0, head: 0, hatColour: 0, eyewear: 0, facial: 0, earrings: 0 } };
 const NAMES = ['Tunde', 'Amara', 'Ifeoma', 'Kwame', 'Zainab', 'Femi', 'Chioma', 'Dami', 'Ngozi', 'Seyi'];
 const LOOK_LABELS = {
   hair: { short: 'Short', fade: 'Fade', afro: 'Afro', puffs: 'Puffs', braids: 'Braids', locs: 'Locs', bob: 'Bob', long: 'Long', curly: 'Curly', bun: 'Bun', mohawk: 'Mohawk', bald: 'Bald' },
@@ -1096,6 +1108,10 @@ const LOOK_LISTS = { hair: HAIR, head: HEADWEAR, eyewear: EYEWEAR, facial: FACIA
 
 function renderCreate() {
   if (!create.name) create.name = pick(NAMES);
+  // Immigrants pick where they moved from; everyone else defaults to UK-born.
+  if (!create.country || (create.bg === 'immigrant' && create.country === 'GB')) {
+    create.country = create.bg === 'immigrant' ? pick(COUNTRIES.slice(1))[0] : 'GB';
+  }
   const L = create.look;
   const sw = (arr, key) => arr.map((c, i) => `<button class="swatch ${L[key] === i ? 'on' : ''}" style="background:${c}" data-look="${key}" data-i="${i}" aria-label="${key} ${i + 1}"></button>`).join('');
   const chips = (key) => LOOK_LISTS[key].map((v, i) => `<button class="chip-btn ${L[key] === i ? 'on' : ''}" data-look="${key}" data-i="${i}">${LOOK_LABELS[key][v]}</button>`).join('');
@@ -1127,10 +1143,33 @@ function renderCreate() {
         <p>${b.blurb}</p>
         <p class="bg-goal">🏆 ${b.goal}</p>
         <span class="bg-stats">Start: ${money(b.money)}${b.debt ? ` · Debt ${money(b.debt)}` : ''} · Rent ${b.rent ? money(b.rent) + '/wk' : 'paid by Pater'}</span>
-      </button>`).join('')}</div>`;
+      </button>`).join('')}</div>
+    <h4>${create.bg === 'immigrant' ? 'Where did you move from?' : 'Where are your family roots?'}</h4>
+    <div class="country-row">
+      <span class="country-picked">${flagOf(create.country)} <b>${esc(countryName(create.country))}</b></span>
+      <input id="countrySearch" class="country-search" placeholder="Search countries" value="${esc(create.countrySearch)}" aria-label="Search countries">
+    </div>
+    <div class="countries">${COUNTRIES.filter(([c, n]) => !(create.bg === 'immigrant' && c === 'GB') && n.toLowerCase().includes(create.countrySearch.toLowerCase())).map(([c, n]) => `
+      <button class="country ${create.country === c ? 'on' : ''}" data-country="${c}" title="${esc(n)}"><span class="flag">${flagOf(c)}</span><span>${esc(n)}</span></button>`).join('') || '<p class="hint">No country matches that search.</p>'}</div>`;
   if ($('.create-card')) $('.create-card').scrollTop = scroll;
+  document.querySelectorAll('[data-country]').forEach((b) => { b.onclick = () => { create.country = b.dataset.country; renderCreate(); }; });
+  const cs = $('#countrySearch');
+  cs.oninput = (e) => {
+    create.countrySearch = e.target.value;
+    renderCreate();
+    const again = $('#countrySearch');
+    again.focus();
+    again.setSelectionRange(again.value.length, again.value.length);
+  };
   document.querySelectorAll('[data-look]').forEach((b) => { b.onclick = () => { L[b.dataset.look] = +b.dataset.i; renderCreate(); }; });
-  document.querySelectorAll('[data-bg]').forEach((b) => { b.onclick = () => { create.bg = b.dataset.bg; renderCreate(); }; });
+  document.querySelectorAll('[data-bg]').forEach((b) => {
+    b.onclick = () => {
+      const was = create.bg;
+      create.bg = b.dataset.bg;
+      if (was === 'immigrant' && create.bg !== 'immigrant') create.country = 'GB';
+      renderCreate();
+    };
+  });
   $('#randomBtn').onclick = () => {
     const r = (n) => Math.floor(Math.random() * n);
     Object.assign(L, {
@@ -1156,7 +1195,7 @@ function newGame() {
   const B = BACKGROUNDS[create.bg];
   const look = lookFromCreate();
   S = {
-    v: 1, name: (create.name || 'Tunde').trim().slice(0, 16) || 'Tunde', bg: create.bg, look,
+    v: 1, name: (create.name || 'Tunde').trim().slice(0, 16) || 'Tunde', bg: create.bg, look, country: create.country || 'GB',
     t: 8 * 60, loc: create.bg === 'immigrant' ? 'heathrow' : B.home, home: B.home,
     money: B.money, debt: B.debt, rent: B.rent, allowance: create.bg === 'oldmoney' ? 400 : 0,
     needs: { hunger: 70, energy: create.bg === 'immigrant' ? 45 : 75, fun: 65, social: 55, hygiene: create.bg === 'immigrant' ? 50 : 80 },
@@ -1169,9 +1208,9 @@ function newGame() {
   };
   S.weather = rollWeather();
   const intro = {
-    immigrant: `✈️ ${S.name} has landed at Heathrow. £1,200 in the bank, a student visa and a suitcase full of garri. Your room is in Woolwich. The Elizabeth line goes straight there.`,
-    oldmoney: `🎩 ${S.name} wakes up in a Chelsea flat Pater pays for. Allowance: £400 a week. Ambition: undecided.`,
-    newgen: `🧢 ${S.name} wakes up in the family council flat in Peckham. £300 in the bank, £2,000 owed to QuickCash. Time to get it.`,
+    immigrant: `✈️ ${S.name} has landed at Heathrow from ${countryName(S.country)} ${flagOf(S.country)}. £1,200 in the bank, a new visa and two suitcases full of hope. Your room is in Woolwich. The Elizabeth line goes straight there.`,
+    oldmoney: `🎩 ${S.name}${S.country !== 'GB' ? `, from old ${countryName(S.country)} ${flagOf(S.country)} money,` : ''} wakes up in a Chelsea flat Pater pays for. Allowance: £400 a week. Ambition: undecided.`,
+    newgen: `🧢 ${S.name}${S.country !== 'GB' ? `, London-born with ${countryName(S.country)} ${flagOf(S.country)} roots,` : ''} wakes up in the family council flat in Peckham. £300 in the bank, £2,000 owed to QuickCash. Time to get it.`,
   }[S.bg];
   log(intro);
   save();
@@ -1200,7 +1239,12 @@ function init() {
     $('[data-close]').onclick = closeModal;
     $('#confirmNew').onclick = () => { clearSave(); closeModal(); showScreen('create'); };
   };
-  $('#continueBtn').onclick = () => { S = load(); if (S) startGame(); };
+  $('#continueBtn').onclick = () => {
+    S = load();
+    if (!S) return;
+    if (!S.country) S.country = S.bg === 'immigrant' ? 'NG' : 'GB'; // saves from before the country picker
+    startGame();
+  };
   $('#startBtn').onclick = newGame;
   $('#backBtn').onclick = showTitle;
   $('#modal').addEventListener('click', (e) => {
@@ -1212,4 +1256,5 @@ function init() {
   showTitle();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+// js/boot.js calls this once every script has loaded.
+window.startLondonHustle = init;

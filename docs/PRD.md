@@ -1,15 +1,15 @@
 # London Hustle: Product Requirements Document
 
-**Product:** Japa Simulator: London Hustle
+**Product:** London Hustle
 **Owner:** Tony Udomiaye
-**Status:** Phase 1 in build · Phases 2–3 planned
+**Status:** Phase 1 in build · Phases 2–3 planned · Phase 4 proposed (awaiting approval)
 **Last updated:** 18 October 2026
 
 ---
 
 ## 1. Summary
 
-London Hustle is a free, browser-based 3D life simulator set in London. Players create a Memoji-style character, choose a starting life (Fresh Japa, Old Money or New Gen) and survive 60 days of London: rent, the Tube, jobs, visas, friends and the city's culture. It is inspired by the format of *Lagos Life* (lagoslife.app), which grew to millions of players in days by making a whole city feel personal and funny. London Hustle applies that format to London, with a strong diaspora ("japa") story at its centre.
+London Hustle is a free, browser-based 3D life simulator set in London. Players create a Memoji-style character, choose where they are from and a starting life (Fresh Immigrant, Old Money or New Gen) and survive 60 days of London: rent, the Tube, jobs, visas, friends and the city's culture. It is inspired by the format of *Lagos Life* (lagoslife.app), which grew to millions of players in days by making a whole city feel personal and funny. London Hustle applies that format to London, with immigrant success stories at its heart: London is a city built by people who arrived with very little and made it.
 
 ## 2. Reference product: what Lagos Life does
 
@@ -43,7 +43,7 @@ A scan of lagoslife.app (public pages, Terms, Privacy Policy, public API respons
 
 ## 4. Audience
 
-- **Primary:** Nigerians and other West Africans in the UK or planning to move ("japa"), aged 18–35.
+- **Primary:** Immigrants and children of immigrants in the UK, and people planning to move here, from every country, aged 18–35.
 - **Secondary:** Londoners and UK Gen Z who enjoy satire about rent, the Tube and the cost of living.
 - **Tertiary:** Anyone who played Lagos Life and wants another city.
 
@@ -53,11 +53,12 @@ A scan of lagoslife.app (public pages, Terms, Privacy Policy, public API respons
 1. The title screen shows the living 3D city slowly panning behind a card: "Live your London story".
 2. Character creation: a large Memoji-style 3D head that updates live while the player picks skin, hair, colours, headwear, glasses, facial hair, earrings and outfit.
 3. The player chooses one of three lives:
-   - **Fresh Japa:** lands at Heathrow on a student visa (20 hours of work a week). Goal: switch to a Skilled Worker visa by day 35, then save £3,000.
+   - **Fresh Immigrant:** "Just landed in London with an immigrant visa." Arrives at Heathrow on a starter visa (20 hours of work a week). Goal: switch to a Skilled Worker visa by day 35, then save £3,000.
    - **Old Money:** Chelsea flat and an allowance until Pater cuts them off on day 15. Goal: £12,000 net worth.
    - **New Gen:** Peckham council flat with £2,000 of high-interest debt. Goal: clear the debt and save £2,500.
-4. The player taps buildings to travel (Tube, bus, bike, walk, cab), takes actions, gets jobs and makes friends.
-5. The game ends at day 60, or earlier through deportation or eviction, with a grade and a shareable result.
+4. The player picks **where they are from**, by flag: the country they moved from (Fresh Immigrant) or their family roots (Old Money and New Gen, UK by default). The flag shows next to their name, on the ending card and in the share text, and the "fly home" trip and family calls use it.
+5. The player taps buildings to travel (Tube, bus, bike, walk, cab), takes actions, gets jobs and makes friends.
+6. The game ends at day 60, or earlier through deportation or eviction, with a grade and a shareable result.
 
 ### 5.2 Core loop
 Check needs → choose a place → travel (time and money) → take an action (time, money, needs, skills) → random London events → weekly bills on Monday.
@@ -85,6 +86,14 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 | G4 | **Daily headline** (parody newspaper "The Evening Hustle") and a tip in the ticker each morning, like Lagos Life's daily feed. | P1 |
 | G5 | Keep the current systems: needs, skills, Tube fares with caps, strikes, the Night Tube, rent, debt, visas, friends with perks, events, endings, save in the browser. | P0 |
 | P1 | Installable PWA (manifest and icon). | P2 |
+| S1 | **Fresh Immigrant** replaces the Lagos-specific "Fresh Japa" story: universal immigrant story, "starter visa" wording, "fly home" and family events. | P0 |
+| S2 | **Country picker with flags** for every life (about 50 countries, searchable). Flag shown in the HUD, ending card and share text. | P0 |
+| E1 | **Rendering engine upgrade** (Three.js 0.169): physically based materials, ACES filmic tone mapping, environment lighting from a sky. | P0 |
+| E2 | Real-time soft shadows from the sun, which follows the camera; drifting cloud shadows. | P0 |
+| E3 | Ambient occlusion (GTAO) for soft contact shadows; bloom for night lights. | P1 |
+| E4 | Reflective glass towers and water; lit windows across the city at night. | P1 |
+| E5 | Glossy clear-coat materials and studio lighting for characters. | P1 |
+| E6 | Graphics setting (High, Medium, Low), automatically Medium on phones. | P0 |
 | Q1 | Works at 390px phone width; no horizontal scrolling; readable in light and dark device modes. | P0 |
 | Q2 | Smooth on a mid-range phone (aim for 30+ fps). | P1 |
 
@@ -97,8 +106,8 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 | L3 | Chat and "gist": local chat per place, friend requests, DMs with moderation and reporting. | P0 |
 | L4 | **Mayor of London elections:** players stand, campaign and vote each term; the Mayor picks a policy that changes the rules for everyone (Tube fare freeze, rent cap, minimum wage rise, ULEZ charge) and posts announcements to the banner. | P1 |
 | L5 | Shared property market: limited flats and "Thames plots" players can buy and rent out. | P1 |
-| L6 | Real advertiser billboards and plots (self-serve booking, approval queue). | P2 |
-| L7 | Verified creator accounts. | P2 |
+| L6 | Account types (player, creator, brand) so Phase 4 can build on them. | P1 |
+| L7 | Verified creator accounts and public player profiles (follower counts, reach), needed for brand collaborations. | P1 |
 | L8 | Daily headline written by an editor or generated, served from the API. | P2 |
 
 ### Phase 3: Deeper life sim
@@ -112,21 +121,72 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 | D5 | Crime and justice: pickpockets, police, magistrates court, fines. | P2 |
 | D6 | Healthcare: NHS GP waits, A&E, sickness moodlets. | P2 |
 | D7 | Vehicles: Lime bikes, mopeds, cars and the congestion charge. | P2 |
-| D8 | More cities: Manchester, Birmingham, plus a "fly home to Lagos" link-up. | P2 |
+| D8 | More cities: Manchester, Birmingham, plus "fly home" link-ups with other city games. | P2 |
 | D9 | Native app wrappers (iOS/Android). | P2 |
+
+### Phase 4: Brand marketplace (proposed, awaiting approval)
+
+**Goal:** let businesses advertise inside London Hustle and collaborate with players, with players sharing in the revenue. Builds on Phase 2 accounts and profiles.
+
+#### 4.1 Revenue products and splits (agreed 18 Oct 2026)
+
+| Product | What the brand buys | Revenue split |
+|---|---|---|
+| **Ad spaces** | Public billboards, Thames plots, bus wraps, Tube posters, venue sponsorship (e.g. "ASOS Covent Garden") | **Platform 100%** |
+| **Player-owned placements** | A billboard on a player's house roof or shopfront | **Property owner 25% / platform 75%** |
+| **Creator collaborations** | A chosen player wears the brand's items, brands their home and posts from inside the game | **Creator 70% / platform 30%**. Verified top creators: **80% / 20%** |
+| **Brand drops** | Free branded items available to every player | **Platform 100%** (players get the items free) |
+| **Community pool** | Funded from ad spaces and brand drops | **3% of that revenue**, shared monthly among active players by playtime |
+
+Splits apply to net revenue, after payment processing fees (roughly 2–3%). Brands may add a performance bonus through their own affiliate links (for example 5% of tracked sales), paid on top of the campaign fee.
+
+**Worked example: an ASOS fall launch with one creator, £10,000.**
+
+| Part | Price | Creator gets | Platform gets |
+|---|---|---|---|
+| Character wears the line + 3 in-game posts | £8,000 | £5,600 (70%) | £2,400 |
+| Rooftop billboard on the creator's house for 4 weeks | £2,000 | £500 (25%) | £1,500 |
+| **Total** | **£10,000** | **£6,100** | **£3,900** |
+
+#### 4.2 Requirements
+
+| ID | Requirement | Priority |
+|---|---|---|
+| M1 | **Brand accounts** with company verification (company number, website, contact) and a brand dashboard. | P0 |
+| M2 | **Ad inventory and booking:** a map of available ad spaces with format, size, location, audience estimate and price; book by the week; upload artwork; see live status. | P0 |
+| M3 | **Pricing:** fixed weekly prices per space to start (premium for central London and landmarks), moving to impressions-based (CPM) pricing once traffic data exists. | P1 |
+| M4 | **Player-owned ad slots:** players who own or rent a home can opt in to a rooftop billboard slot, set a minimum price, and approve or decline every booking. | P0 |
+| M5 | **Creator marketplace:** creators opt in with a profile (reach, audience, style, rates); brands search, send a brief and an offer; creators accept, counter or decline. | P0 |
+| M6 | **Campaign delivery in the game:** branded outfits and items appear on the creator's avatar, branding on their home, and sponsored posts, all for the agreed dates. | P0 |
+| M7 | **Brand drops:** brands publish free items (outfits, accessories, furniture) to every player's wardrobe for a set period. | P1 |
+| M8 | **Reporting:** impressions, unique viewers, time in view, clicks on "Shop the look" links, sales from affiliate links where the brand shares them. | P0 |
+| M9 | **Payouts:** creator earnings dashboard, payouts through a regulated provider (e.g. Stripe Connect), £50 minimum, paid 30 days after a campaign ends; earnings held if fraud is suspected. | P0 |
+| M10 | **Community pool:** 3% of ad-space and brand-drop revenue, shared monthly among active players by playtime; paid as real money above the payout minimum, otherwise rolled over. | P1 |
+| M11 | **Review and brand safety:** every ad and campaign is reviewed before going live; banned categories (gambling, adult, weapons, political ads); alcohol limited and never near young-looking content; players can hide any ad they find offensive. | P0 |
+| M12 | **Clear labelling:** every sponsored item, billboard and post shows "Ad" or "Paid partnership", in line with the UK CAP Code. | P0 |
+
+#### 4.3 Who can earn
+- Earning players must be 18+, identity-verified, and accept creator terms. Real-money payouts go to **verified creators only** at launch.
+- Tax: the UK requires digital platforms to report sellers' earnings to HMRC (the OECD model reporting rules). The payout provider collects the details; players are responsible for their own tax.
+- Anti-fraud: no paying for views from bots or alt accounts; impression counting excludes idle and duplicate sessions.
+
+#### 4.4 Out of scope for Phase 4
+- Programmatic ad networks and third-party ad tracking (no ad tracking across other sites, matching our privacy stance).
+- Selling player data to brands. Brands see aggregated reporting only.
 
 ## 7. Look and feel
 
 - **City:** bright low-poly London on a soft green ground, a blue Thames with sandy embankments, grey roads, white plots. Landmarks are larger than real scale so they read clearly from above.
 - **Characters:** Memoji-inspired. Oversized rounded heads, large eyes with white highlights, soft glossy shading, simple friendly smiles. Original models, not Apple assets.
 - **Interface:** frosted white pills, green primary buttons, emoji pins, a green announcement ticker, a bottom card for actions. Font: Plus Jakarta Sans.
-- **Tone:** affectionate London and Naija humour. Brands are parodies (Prest, Primork, Delivaroo, Ubah, QuickCash).
+- **Tone:** affectionate London humour that celebrates the city's many cultures and its immigrant success stories. Brands are parodies (Prest, Primork, Delivaroo, Ubah, QuickCash).
 
 ## 8. Technical approach
 
-- **Phase 1:** static HTML/CSS/JS with Three.js (r128 from cdnjs). No build step. Hosted on GitHub Pages or Vercel. Saves in `localStorage`.
+- **Phase 1:** static HTML/CSS/JS with Three.js 0.169 (ES modules from jsDelivr, loaded through an import map) and its post-processing add-ons. No build step. Hosted on GitHub Pages or Vercel. Saves in `localStorage`.
 - **Phase 2:** add a backend, for example Supabase (Postgres, auth, realtime) or Firebase. Websocket presence for live players, row-level security on all player data, rate limiting and moderation for chat.
-- **Performance:** shared geometries and cached materials, instancing for trees and filler buildings, capped device pixel ratio, lower detail on phones.
+- **Performance:** shared geometries and cached materials, instancing for trees and filler buildings, capped device pixel ratio, and a graphics setting that turns off ambient occlusion and shadows on weaker devices.
+- **Phase 4:** payments and payouts through Stripe Connect (identity checks, payouts, tax reporting data); ad artwork stored and served by our own backend; an admin review queue.
 
 ## 9. Success metrics
 
@@ -143,10 +203,12 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 - Parody names for brands; real place names and landmarks are used descriptively.
 - Do not reuse Lagos Life's or Apple's assets, code, names or logos. Do not use the TfL roundel or Underground logo.
 - Phase 2 needs a privacy policy, terms, an 18+ gate, chat moderation and a reporting flow before launch.
+- Phase 4 needs advertiser terms, creator terms, an ad review policy, CAP Code-compliant labelling, and HMRC platform reporting through the payout provider.
 
 ## 11. Open questions
 
 1. Should Phase 2 run on Supabase or Firebase?
 2. Should the 60-day limit stay, or should the game become open-ended once multiplayer exists?
 3. Should we add a music partner or licensed soundtrack, as Lagos Life did?
-4. Should we monetise, and how (cosmetics, advertiser billboards)?
+4. Phase 4: what weekly price should the first ad spaces launch at? (Suggestion: £50–£500 per week depending on location, reviewed after the first month of traffic data.)
+5. Phase 4: should brand drops be free for players forever, or limited-time items that create urgency?

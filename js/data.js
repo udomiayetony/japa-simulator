@@ -1,12 +1,12 @@
-// Static world data for Japa Simulator: London Hustle.
+// Static world data for London Hustle.
 // Brands are parodies; places, landmarks and Tube lines follow real London geography (simplified).
 
 const BACKGROUNDS = {
   immigrant: {
-    name: 'Fresh Japa',
-    tag: 'Just landed from Lagos on a student visa',
-    blurb: 'You sold your car, said bye to Mummy at Murtala Muhammed and landed at Heathrow with £1,200 and big dreams. Student visa: 20 hours of work a week, and the clock is ticking.',
-    goal: 'Switch to a Skilled Worker visa before your student visa expires (day 35), then reach £3,000 in savings by day 60.',
+    name: 'Fresh Immigrant',
+    tag: 'Just landed in London with an immigrant visa',
+    blurb: "You packed your whole life into two suitcases, hugged your family goodbye and landed at Heathrow with £1,200 and big dreams. Your starter visa lets you work 20 hours a week, and the clock is ticking. Millions of Londoners started exactly here, and plenty of them made it big.",
+    goal: 'Switch to a Skilled Worker visa before your starter visa runs out (day 35), then reach £3,000 in savings by day 60.',
     home: 'woolwich',
     money: 1200, debt: 0, rent: 140,
     skills: { hustle: 30, charm: 20, code: 20 },
@@ -42,6 +42,20 @@ const EYEWEAR = ['none', 'round', 'square', 'shades'];
 const FACIAL = ['none', 'stubble', 'goatee', 'moustache', 'beard'];
 const EARRINGS = ['none', 'studs', 'hoops'];
 
+// Where your character is from. Flags are emoji built from the two-letter country code.
+const COUNTRIES = [
+  ['GB', 'United Kingdom'], ['NG', 'Nigeria'], ['GH', 'Ghana'], ['KE', 'Kenya'], ['ZA', 'South Africa'], ['ZW', 'Zimbabwe'],
+  ['UG', 'Uganda'], ['CM', 'Cameroon'], ['SL', 'Sierra Leone'], ['SO', 'Somalia'], ['ET', 'Ethiopia'], ['SD', 'Sudan'],
+  ['EG', 'Egypt'], ['MA', 'Morocco'], ['JM', 'Jamaica'], ['TT', 'Trinidad and Tobago'], ['BB', 'Barbados'], ['IN', 'India'],
+  ['PK', 'Pakistan'], ['BD', 'Bangladesh'], ['LK', 'Sri Lanka'], ['NP', 'Nepal'], ['CN', 'China'], ['HK', 'Hong Kong'],
+  ['PH', 'Philippines'], ['VN', 'Vietnam'], ['MY', 'Malaysia'], ['JP', 'Japan'], ['KR', 'South Korea'], ['AF', 'Afghanistan'],
+  ['IR', 'Iran'], ['IQ', 'Iraq'], ['SY', 'Syria'], ['TR', 'Turkey'], ['PL', 'Poland'], ['RO', 'Romania'], ['UA', 'Ukraine'],
+  ['LT', 'Lithuania'], ['IT', 'Italy'], ['ES', 'Spain'], ['PT', 'Portugal'], ['FR', 'France'], ['DE', 'Germany'], ['GR', 'Greece'],
+  ['IE', 'Ireland'], ['BR', 'Brazil'], ['CO', 'Colombia'], ['US', 'United States'], ['CA', 'Canada'], ['AU', 'Australia'],
+];
+const flagOf = (code) => String.fromCodePoint(...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+const countryName = (code) => (COUNTRIES.find(([c]) => c === code) || [code, code])[1];
+
 // Real coordinates are turned into map positions (28 units per km around Charing Cross).
 // Outer London is gently squeezed so the whole city fits on screen.
 const GEO_CENTER = [51.5074, -0.1278];
@@ -57,7 +71,7 @@ function place(lat, lon, o) { return { ...o, ...geo(lat, lon), lat, lon }; }
 
 // Playable places. Zones follow the real fare zones.
 const LOCATIONS = {
-  heathrow:    place(51.4700, -0.4543, { name: 'Heathrow', zone: 6, icon: '✈️', desc: 'Where every japa story starts. The arrivals hall smells of hope and overpriced sandwiches.' }),
+  heathrow:    place(51.4700, -0.4543, { name: 'Heathrow', zone: 6, icon: '✈️', desc: 'Where so many London stories start. The arrivals hall smells of hope and overpriced sandwiches.' }),
   hydepark:    place(51.5075, -0.1620, { name: 'Hyde Park', zone: 1, icon: '🌳', desc: "Swans, joggers, Speakers' Corner and the Serpentine." }),
   chelsea:     place(51.4900, -0.1640, { name: 'Chelsea', zone: 1, icon: '💎', desc: "King's Road brunches, Range Rovers and people called Hugo." }),
   oxford:      place(51.5155, -0.1430, { name: 'Oxford Circus', zone: 1, icon: '🛍️', desc: 'Shopping chaos. Tourists stop dead at the top of every staircase.' }),
@@ -115,7 +129,7 @@ const JOBS = {
     levels: [['Tour guide', 13, 0], ['Senior guide', 15, 8, { charm: 45 }], ['Head of tours', 19, 18, { charm: 60 }]] },
   bartender: { title: 'Bartender, Covent Garden', place: 'covent', pay: 12, sponsor: false, req: { charm: 20 }, desc: 'Pouring pints and mixing espresso martinis for theatre crowds.',
     levels: [['Bartender', 12, 0], ['Head bartender', 14.5, 8, { charm: 40 }], ['Bar manager', 18, 18, { charm: 55, hustle: 30 }]] },
-  care:      { title: 'Care worker', place: 'croydon', pay: 13, sponsor: true, req: {}, desc: 'Hard, important work. Many japa stories start here. Sponsors visas.',
+  care:      { title: 'Care worker', place: 'croydon', pay: 13, sponsor: true, req: {}, desc: 'Hard, important work. Many immigrant success stories start here. Sponsors visas.',
     levels: [['Care worker', 13, 0], ['Senior carer', 15, 8, { charm: 30 }], ['Care team leader', 18, 18, { charm: 40, hustle: 35 }]] },
   dev:       { title: 'Junior developer, startup', place: 'shoreditch', pay: 24, sponsor: true, req: { code: 45 }, desc: 'Free kombucha, a ping-pong table and equity that will probably be worth nothing.',
     levels: [['Junior developer', 24, 0], ['Developer', 30, 8, { code: 60 }], ['Senior developer', 38, 18, { code: 75 }]] },
@@ -155,7 +169,7 @@ const TIPS = [
 ];
 
 const NPCS = {
-  chidi: { name: 'Chidi',  place: 'woolwich',   emoji: '🧑🏿', desc: 'Japa veteran, 6 years in. Knows everybody in Woolwich.' },
+  chidi: { name: 'Chidi',  place: 'woolwich',   emoji: '🧑🏿', desc: 'Came to London six years ago with one suitcase. Now he knows everybody in Woolwich.' },
   jade:  { name: 'Jade',   place: 'peckham',    emoji: '👩🏾', desc: 'Peckham born and raised. Does nails, sells vintage, has three side hustles.' },
   tom:   { name: 'Tom',    place: 'chelsea',    emoji: '👱🏼‍♂️', desc: 'Old Etonian. Surprisingly decent. Will invite you to polo.' },
   priya: { name: 'Priya',  place: 'shoreditch', emoji: '👩🏽‍💻', desc: 'Tech recruiter and part-time DJ. Knows which startups are hiring.' },
