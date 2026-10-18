@@ -1,6 +1,6 @@
 # 🇬🇧 Japa Simulator: London Hustle
 
-A free, Sims-style browser game about surviving 60 days in London. Nothing to download, nothing to install. Open it and play.
+A free 3D browser life sim about surviving 60 days in London. Pan around a low-poly London, tap a building to go there, and hustle. Nothing to download, nothing to install.
 
 ## Pick your London life
 
@@ -11,6 +11,8 @@ A free, Sims-style browser game about surviving 60 days in London. Nothing to do
 | 🧢 **New Gen** | Council flat in Peckham, £2,000 owed to QuickCash Loans at 2% a week. | Clear the debt and save a £2,500 deposit. |
 
 ## What's in the world
+
+- **A 3D low-poly London** you can drag and zoom: the Thames, Big Ben and Parliament, the London Eye, the Shard, Tower Bridge, the Gherkin, St Paul's, Canary Wharf, the Olympic Stadium and the Orbit, red buses, black cabs, river boats and parody billboards. Day turns to night and it actually rains.
 
 - **A real(ish) Tube map**: Elizabeth, Jubilee, Central, Northern, Victoria, Piccadilly, District, Overground, DLR and rail, with zone-based fares, peak/off-peak pricing, daily caps, Night Tube at weekends and RMT strikes.
 - **Ways to travel**: Tube, bus (Hopper fare), hire bikes, walking and pricey late-night cabs. Delays, egg sandwiches and lucky seats on the way.
@@ -27,14 +29,13 @@ Progress saves automatically in your browser.
 
 ## Play locally
 
-It's plain HTML, CSS and JavaScript, so there's no build step.
+It's plain HTML, CSS and JavaScript (with Three.js from a CDN), so there's no build step.
 
 ```bash
 python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-(Opening `index.html` directly also works.)
 
 ## Deploy for free
 
@@ -44,10 +45,11 @@ python3 -m http.server 8000
 ## Project layout
 
 ```
-index.html     page shell and screens
+index.html     page shell, HUD and screens
 style.css      all styling (responsive down to phone width)
 js/data.js     world data: backgrounds, places, Tube lines, jobs, friends
-js/game.js     engine: time, needs, travel, actions, events, endings, rendering
+js/game.js     engine: time, needs, travel, actions, events, endings, HUD
+js/world.js    the 3D city (Three.js): landmarks, traffic, camera, pins
 ```
 
 Brand names in the game are parodies. Place names and Tube lines are real London geography, simplified.

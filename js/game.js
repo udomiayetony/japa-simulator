@@ -257,6 +257,10 @@ function travel(to, mode) {
   advance(mins);
   fx({ energy: -tiring });
   S.loc = to;
+  ui.target = null;
+  ui.tab = 'here';
+  World.moveAvatar(to);
+  World.focus(to);
   log(`${o.label.split(' ')[0]} ${LOCATIONS[from].name} → ${LOCATIONS[to].name} (${mins} min${o.cost ? ', ' + money(o.cost) : ''}).${extra}`);
   afterAction();
 }
@@ -831,49 +835,10 @@ function avatarSVG(look, m = 70) {
   </svg>`;
 }
 
-// ---------------------------------------------------------------- map
+// ---------------------------------------------------------------- HUD over the 3D city
 
-function mapSVG() {
-  const L = LOCATIONS;
-  const segs = [];
-  LINES.forEach((line, li) => {
-    const off = ((li % 3) - 1) * 3.5;
-    for (let i = 0; i < line.stops.length - 1; i++) {
-      const a = L[line.stops[i]], b = L[line.stops[i + 1]];
-      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy);
-      const nx = (-dy / len) * off, ny = (dx / len) * off;
-      segs.push(`<line x1="${a.x + nx}" y1="${a.y + ny}" x2="${b.x + nx}" y2="${b.y + ny}" stroke="${line.colour}" stroke-width="5" stroke-linecap="round" ${line.rail ? 'stroke-dasharray="10 6"' : ''}><title>${line.name}</title></line>`);
-    }
-  });
-  const stations = Object.entries(L).map(([id, p]) => {
-    const here = id === S.loc, home = id === S.home;
-    const below = ['southbank', 'peckham', 'brixton', 'canary', 'chelsea', 'woolwich'].includes(id);
-    return `<g class="station ${here ? 'here' : ''}" data-loc="${id}" tabindex="0" role="button" aria-label="${esc(p.name)}">
-      <circle class="hit" cx="${p.x}" cy="${p.y}" r="24" />
-      <circle class="dot" cx="${p.x}" cy="${p.y}" r="${here ? 15 : 12}" />
-      <text class="st-icon" x="${p.x}" y="${p.y + 4}" text-anchor="middle">${home ? '🏠' : p.icon}</text>
-      <text class="st-label" x="${p.x}" y="${p.y + (below ? 31 : -20)}" text-anchor="middle">${esc(p.name)}</text>
-    </g>`;
-  }).join('');
-  const me = L[S.loc];
-  const weather = S.weather === 'rain' ? '<g class="rain">' + Array.from({ length: 40 }, (_, i) => `<line x1="${(i * 97) % 1000}" y1="${(i * 53) % 620}" x2="${((i * 97) % 1000) - 6}" y2="${((i * 53) % 620) + 14}"/>`).join('') + '</g>' : '';
-  const nightOpacity = hour() >= 21 || hour() < 6 ? 0.28 : hour() >= 19 ? 0.12 : 0;
-  return `<svg viewBox="0 0 1000 620" id="map" role="img" aria-label="Map of London">
-    <rect width="1000" height="620" class="land"/>
-    <path class="park" d="M255 265 Q300 250 345 268 L340 305 Q300 318 258 302 Z"/>
-    <path class="park" d="M760 135 Q800 120 840 140 L835 185 Q795 195 765 180 Z"/>
-    <path class="park" d="M600 520 Q640 510 680 525 L675 545 Q640 552 605 540 Z"/>
-    <path class="river" d="M0 455 C120 440 200 470 280 430 C340 400 400 360 470 345 C520 335 560 345 610 360 C660 375 680 420 720 415 C760 410 760 350 800 360 C850 372 880 390 1000 370"/>
-    <text class="river-label" x="150" y="470">River Thames</text>
-    ${segs.join('')}
-    ${stations}
-    <g class="me-pin" transform="translate(${me.x - 15} ${me.y - 66}) scale(.3)">${avatarSVG(S.look, mood()).replace('<svg viewBox="0 0 100 135" class="avatar" aria-hidden="true">', '').replace('</svg>', '')}</g>
-    ${weather}
-    <rect width="1000" height="620" fill="#0b1640" opacity="${nightOpacity}" pointer-events="none"/>
-  </svg>`;
-}
-
-// ---------------------------------------------------------------- render
+const ui = { tab: 'here', target: null, expanded: false };
+const NEED_ICONS = { hunger: '🍔', energy: '⚡', fun: '🎉', social: '💬', hygiene: '🚿' };
 
 function bar(label, v, cls = '') {
   const lvl = v < 25 ? 'low' : v < 50 ? 'mid' : 'ok';
@@ -883,73 +848,147 @@ function bar(label, v, cls = '') {
 function render() {
   if (!S) return;
   const w = WEATHER.find((x) => x.id === S.weather);
+  $('#clockPill').innerHTML = `<i class="dot"></i>Day ${Math.min(day(), GAME_DAYS)}/${GAME_DAYS} · ${DAYS[dow()]} ${clock()}`;
+  $('#topActions').innerHTML = `
+    <span class="pill money ${S.money < 0 ? 'neg' : ''}">💷 ${money(S.money)}</span>
+    <button class="pill icon" id="helpBtn" aria-label="How to play">?</button>
+    <button class="pill icon" id="menuBtn" aria-label="Menu">☰</button>`;
+  const chips = [
+    `${w.icon} ${w.label}`,
+    `🏠 Rent ${money(S.rent)}/wk`,
+    `💼 ${S.job ? esc(JOBS[S.job].title.split(',')[0].split(' (')[0]) : 'Unemployed'}`,
+  ];
+  if (S.debt > 0) chips.push(`💳 Debt ${money(S.debt)}`);
+  if (S.visa) chips.push(S.visa.type === 'student' ? `🛂 Visa: ${Math.max(0, S.visa.expires - day())} days` : '🛂 Skilled Worker ✅');
+  if (S.strike) chips.push('🚇 Tube strike');
+  $('#chips').innerHTML = chips.map((c) => `<span class="pill chip">${c}</span>`).join('');
+  const last = S.log[0];
+  $('#ticker').innerHTML = last ? `<span>${esc(last.text)}</span>` : '';
+  $('#ticker').classList.toggle('bad', !!last && last.kind === 'bad');
+
   const [mEmoji, mText] = moodLabel(mood());
-  $('#hud').innerHTML = `
-    <div class="hud-item brand">🇬🇧 Japa Sim</div>
-    <div class="hud-item"><small>${DAYS[dow()]} · Day ${Math.min(day(), GAME_DAYS)}/${GAME_DAYS}</small><b>${clock()}</b></div>
-    <div class="hud-item"><small>Weather</small><b>${w.icon} ${w.label}</b></div>
-    <div class="hud-item ${S.money < 0 ? 'neg' : ''}"><small>Bank</small><b>${money(S.money)}</b></div>
-    ${S.debt > 0 ? `<div class="hud-item neg"><small>Debt</small><b>${money(S.debt)}</b></div>` : ''}
-    <div class="hud-item"><small>Rent/week</small><b>${money(S.rent)}</b></div>
-    <div class="hud-item"><small>Job</small><b>${S.job ? esc(JOBS[S.job].title.split(',')[0]) : 'Unemployed'}</b></div>
-    ${S.strike ? '<div class="hud-item neg"><small>TfL</small><b>Strike!</b></div>' : ''}
-    <div class="hud-actions"><button class="btn small" id="helpBtn" title="How to play">❓</button><button class="btn small" id="menuBtn" title="Menu">☰</button></div>`;
+  $('#dock').innerHTML = `
+    <button class="me-chip" id="meChip" aria-label="Your stats">${avatarSVG(S.look, mood())}<span><b>${esc(S.name)}</b><small>${mEmoji} ${mText}</small></span></button>
+    <div class="rings">${Object.keys(S.needs).map((k) => {
+      const v = Math.round(S.needs[k]);
+      const col = v < 25 ? 'var(--bad)' : v < 50 ? 'var(--amber)' : 'var(--green)';
+      return `<span class="ring" style="--v:${v};--c:${col}" title="${NEED_LABELS[k]} ${v}"><i>${NEED_ICONS[k]}</i></span>`;
+    }).join('')}</div>`;
 
-  $('#me').innerHTML = `
-    <div class="me-top">
-      <div class="me-avatar">${avatarSVG(S.look, mood())}</div>
-      <div>
-        <h3>${esc(S.name)}</h3>
-        <span class="pill">${esc(BACKGROUNDS[S.bg].name)}</span>
-        <p class="mood">${mEmoji} ${mText}</p>
-      </div>
-    </div>
-    <h4>Needs</h4>
-    ${Object.keys(S.needs).map((k) => bar(NEED_LABELS[k], S.needs[k])).join('')}
-    <h4>Skills</h4>
-    ${Object.keys(S.skills).map((k) => bar(SKILL_LABELS[k], S.skills[k], 'skill')).join('')}
-    ${S.bg === 'immigrant' ? bar('Family pride', S.family, 'skill') : ''}
-    <h4>Goal</h4>
-    <p class="goal">${esc(BACKGROUNDS[S.bg].goal)}</p>
-    ${goalProgress().map((g) => bar(g.label, g.pct, 'goalbar')).join('')}
-    <h4>Bag</h4>
-    <div class="bag">
-      <span title="Groceries">🥫 ${S.groceries} meals</span>
-      <span title="Smart outfit">${S.outfit ? '👔 Suit' : '👕 Casual'}</span>
-      <span title="Tube spend today">💳 ${money(S.fares.tube + S.fares.bus)} today</span>
-      ${S.visa && S.visa.type === 'student' ? `<span>🛂 ${S.weekHours}/20h this week</span>` : ''}
-    </div>`;
+  renderSheet();
+  World.markPins(S.loc, S.home, ui.target);
+  World.setTime(hour() + (S.t % 60) / 60, S.weather);
 
-  $('#mapwrap').innerHTML = mapSVG();
-  document.querySelectorAll('.station').forEach((g) => {
-    const go = () => g.dataset.loc !== S.loc && openTravel(g.dataset.loc);
-    g.onclick = go;
-    g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
-  });
+  $('#helpBtn').onclick = showHelp;
+  $('#menuBtn').onclick = showMenu;
+  $('#meChip').onclick = () => { ui.target = null; ui.tab = 'me'; ui.expanded = true; renderSheet(); };
+  $('#ticker').onclick = () => { ui.target = null; ui.tab = 'story'; ui.expanded = true; renderSheet(); };
+}
 
+function renderSheet() {
+  const sheet = $('#sheet');
+  sheet.classList.toggle('expanded', ui.expanded);
+  if (ui.target && ui.target !== S.loc) return renderTravel(sheet);
+  const tabs = [['here', '📍 ' + (S.loc === S.home ? 'Home' : 'Here')], ['me', '🧍 Me'], ['story', '📖 Story']];
+  let body = '';
+  if (ui.tab === 'here') body = hereHTML();
+  else if (ui.tab === 'me') body = meHTML();
+  else body = `<ol class="log">${S.log.slice(0, 40).map((l) => `<li class="${l.kind}"><time>${l.t}</time><span>${esc(l.text)}</span></li>`).join('')}</ol>`;
+  sheet.innerHTML = `
+    <button class="handle" id="sheetHandle" aria-label="${ui.expanded ? 'Collapse' : 'Expand'} panel"><i></i></button>
+    <nav class="tabs">${tabs.map(([id, label]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</nav>
+    <div class="sheet-body">${body}</div>`;
+  $('#sheetHandle').onclick = () => { ui.expanded = !ui.expanded; renderSheet(); };
+  sheet.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { ui.tab = b.dataset.tab; ui.expanded = ui.tab !== 'here' || ui.expanded; renderSheet(); }; });
+  if (ui.tab === 'here') {
+    const acts = placeActions(S.loc);
+    sheet.querySelectorAll('[data-act]').forEach((b) => { b.onclick = () => runAction(acts[+b.dataset.act]); });
+  }
+}
+
+const EARNS = /Work|Sell|Busk|Flip|Apply|Skilled Worker/;
+function hereHTML() {
   const loc = LOCATIONS[S.loc];
   const acts = placeActions(S.loc);
-  const npcsHere = Object.entries(NPCS).filter(([, n]) => n.place === S.loc);
-  $('#place').innerHTML = `
+  const npcs = Object.values(NPCS).filter((n) => n.place === S.loc);
+  return `
     <div class="place-head">
       <span class="place-icon">${S.loc === S.home ? '🏠' : loc.icon}</span>
-      <div><h3>${esc(loc.name)}${S.loc === S.home ? ' <span class="pill">Home</span>' : ''}</h3><small>Zone ${loc.zone}</small></div>
+      <div><h3>${esc(loc.name)}</h3><small>Zone ${loc.zone}${S.loc === S.home ? ' · Your home' : ''}</small></div>
     </div>
     <p class="desc">${esc(loc.desc)}</p>
-    ${npcsHere.map(([, n]) => `<p class="npc">${n.emoji} <b>${n.name}</b> is around. ${esc(n.desc)}</p>`).join('')}
+    ${npcs.map((n) => `<p class="npc">${n.emoji} <b>${n.name}</b> is around. ${esc(n.desc)}</p>`).join('')}
     <div class="actions">${acts.map((a, i) => `
-      <button class="act" data-act="${i}" ${a.disabled ? 'disabled' : ''}>
+      <button class="act ${EARNS.test(a.label) && !a.disabled ? 'go' : ''}" data-act="${i}" ${a.disabled ? 'disabled' : ''}>
         <span class="act-label">${esc(a.label)}</span>
         <span class="act-meta">${fmtMins(a.mins)}${a.cost ? ' · ' + money(a.cost) : ''}${a.sub ? ' · ' + esc(a.sub) : ''}</span>
         ${a.disabled ? `<span class="act-why">${esc(a.disabled)}</span>` : ''}
       </button>`).join('')}
     </div>
-    <p class="hint">🗺️ Tap a station on the map to travel.${S.loc !== S.home ? ` Home is ${esc(LOCATIONS[S.home].name)}.` : ''}</p>`;
-  document.querySelectorAll('[data-act]').forEach((b) => { b.onclick = () => runAction(acts[+b.dataset.act]); });
+    <p class="hint">Tap any building on the map to travel there.</p>`;
+}
 
-  $('#log').innerHTML = S.log.slice(0, 30).map((l) => `<li class="${l.kind}"><time>${l.t}</time>${esc(l.text)}</li>`).join('');
-  $('#helpBtn').onclick = showHelp;
-  $('#menuBtn').onclick = showMenu;
+function meHTML() {
+  return `
+    <div class="me-grid">
+      <div>
+        <h4>Needs</h4>${Object.keys(S.needs).map((k) => bar(NEED_ICONS[k] + ' ' + NEED_LABELS[k], S.needs[k])).join('')}
+        <h4>Skills</h4>${Object.keys(S.skills).map((k) => bar(SKILL_LABELS[k], S.skills[k], 'skill')).join('')}
+        ${S.bg === 'immigrant' ? bar('Family pride', S.family, 'skill') : ''}
+      </div>
+      <div>
+        <h4>Goal · ${esc(BACKGROUNDS[S.bg].name)}</h4>
+        <p class="goal">${esc(BACKGROUNDS[S.bg].goal)}</p>
+        ${goalProgress().map((g) => bar(g.label, g.pct, 'goalbar')).join('')}
+        <h4>Bag</h4>
+        <div class="bag">
+          <span>🥫 ${S.groceries} meals</span>
+          <span>${S.outfit ? '👔 Suit' : '👕 Casual'}</span>
+          <span>💳 ${money(S.fares.tube + S.fares.bus)} fares today</span>
+          ${S.visa && S.visa.type === 'student' ? `<span>🛂 ${S.weekHours}/20h worked this week</span>` : ''}
+        </div>
+        <h4>Friends</h4>
+        <div class="bag">${Object.entries(NPCS).map(([id, n]) => `<span>${n.emoji} ${n.name} ${S.rel[id]}</span>`).join('')}</div>
+      </div>
+    </div>`;
+}
+
+function renderTravel(sheet) {
+  const to = ui.target;
+  const p = LOCATIONS[to];
+  const opts = travelOptions(to);
+  const lines = [...new Set(LINES.filter((l) => l.stops.includes(to)).map((l) => l.name))];
+  const npcs = Object.values(NPCS).filter((n) => n.place === to).map((n) => `${n.emoji} ${n.name}`);
+  const jobs = Object.values(JOBS).filter((j) => j.place === to).map((j) => j.title);
+  sheet.innerHTML = `
+    <button class="handle" id="sheetHandle" aria-label="Expand panel"><i></i></button>
+    <div class="sheet-body">
+      <div class="place-head">
+        <span class="place-icon">${to === S.home ? '🏠' : p.icon}</span>
+        <div><h3>${esc(p.name)}</h3><small>Zone ${p.zone} · ${lines.join(', ')}</small></div>
+        <button class="pill icon close" id="stayBtn" aria-label="Close">✕</button>
+      </div>
+      <p class="desc">${esc(p.desc)}</p>
+      ${jobs.length || npcs.length ? `<div class="bag">${jobs.map((j) => `<span>💼 ${esc(j)}</span>`).join('')}${npcs.map((n) => `<span>${n}</span>`).join('')}</div>` : ''}
+      <h4>Get there from ${esc(LOCATIONS[S.loc].name)}</h4>
+      <div class="actions">${opts.map((o) => `
+        <button class="act ${o.mode === 'tube' && !o.disabled ? 'go' : ''}" data-mode="${o.mode}" ${o.disabled ? 'disabled' : ''}>
+          <span class="act-label">${o.label}</span>
+          <span class="act-meta">${fmtMins(o.mins)} · ${o.cost ? money(o.cost) : 'Free'} · ${esc(o.note)}</span>
+          ${o.disabled ? `<span class="act-why">${esc(o.disabled)}</span>` : ''}
+        </button>`).join('')}</div>
+    </div>`;
+  $('#sheetHandle').onclick = () => { ui.expanded = !ui.expanded; renderSheet(); };
+  $('#stayBtn').onclick = () => { ui.target = null; World.focus(S.loc); render(); };
+  sheet.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => travel(to, b.dataset.mode); });
+}
+
+function selectPlace(id) {
+  if (!S || S.over || $('#game').classList.contains('hidden')) return;
+  ui.target = id === S.loc ? null : id;
+  if (!ui.target) ui.tab = 'here';
+  World.focus(id);
+  render();
 }
 
 function fmtMins(m) {
@@ -958,29 +997,11 @@ function fmtMins(m) {
   return `${m} min`;
 }
 
-function openTravel(to) {
-  const p = LOCATIONS[to];
-  const opts = travelOptions(to);
-  const lines = [...new Set(LINES.filter((l) => l.stops.includes(to)).map((l) => l.name))];
-  openModal(`
-    <div class="travel-head"><span class="place-icon">${to === S.home ? '🏠' : p.icon}</span><div><h2>${esc(p.name)}</h2><small>Zone ${p.zone} · ${lines.join(', ')}</small></div></div>
-    <p>${esc(p.desc)}</p>
-    <div class="travel-opts">${opts.map((o) => `
-      <button class="act" data-mode="${o.mode}" ${o.disabled ? 'disabled' : ''}>
-        <span class="act-label">${o.label}</span>
-        <span class="act-meta">${fmtMins(o.mins)} · ${o.cost ? money(o.cost) : 'Free'} · ${esc(o.note)}</span>
-        ${o.disabled ? `<span class="act-why">${esc(o.disabled)}</span>` : ''}
-      </button>`).join('')}</div>
-    <div class="choices"><button class="btn" data-close>Stay here</button></div>`);
-  document.querySelectorAll('[data-mode]').forEach((b) => { b.onclick = () => travel(to, b.dataset.mode); });
-  $('[data-close]').onclick = closeModal;
-}
-
 function showHelp() {
   openModal(`
     <h2>How to play</h2>
     <ul class="help">
-      <li>🗺️ <b>Travel</b> by tapping stations on the map. Tube is fast, buses are cheap, walking is free. Fares are capped daily, like real London.</li>
+      <li>🗺️ <b>Travel</b> by tapping any building in the city. Drag to move around, scroll or pinch to zoom. Tube is fast, buses are cheap, walking is free. Fares are capped daily, like real London.</li>
       <li>⚡ Every action takes <b>time</b>. Keep your <b>needs</b> up: eat, sleep, shower, have fun and see people. A happy you earns more and interviews better.</li>
       <li>💼 <b>Get a job</b> at its location. Better jobs need skills: study at King's Cross, network in the City and Shoreditch, hustle at Camden.</li>
       <li>🤝 <b>Make friends</b> (Chidi in Woolwich, Jade in Peckham, Tom in Chelsea, Priya in Shoreditch). Close friends unlock perks.</li>
@@ -997,10 +1018,12 @@ function showMenu() {
     <p>Your game saves automatically in this browser.</p>
     <div class="choices vertical">
       <button class="btn primary" data-close>Resume</button>
+      <button class="btn" id="howBtn">How to play</button>
       <button class="btn" id="titleBtn">Title screen</button>
       <button class="btn danger" id="restartBtn">Start a new life</button>
     </div>`);
   $('[data-close]').onclick = () => { closeModal(); processQueue(); };
+  $('#howBtn').onclick = showHelp;
   $('#titleBtn').onclick = () => { closeModal(); showTitle(); };
   $('#restartBtn').onclick = (e) => {
     if (!e.currentTarget.dataset.armed) {
@@ -1024,6 +1047,7 @@ function closeModal() { $('#modal').classList.add('hidden'); }
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('hidden', s.id !== id));
+  World.setAttract(id !== 'game');
   if (id === 'create') renderCreate();
 }
 
@@ -1047,7 +1071,7 @@ function renderCreate() {
       </div>
       <div class="looks">
         <h4>Skin</h4><div class="swatches">${sw(SKIN, 'skin')}</div>
-        <h4>Hair</h4><div class="swatches">${HAIR.map((h, i) => `<button class="chip ${create.look.hair === i ? 'on' : ''}" data-hair="${i}">${h}</button>`).join('')}</div>
+        <h4>Hair</h4><div class="swatches">${HAIR.map((h, i) => `<button class="chip-btn ${create.look.hair === i ? 'on' : ''}" data-hair="${i}">${h}</button>`).join('')}</div>
         <h4>Hair colour</h4><div class="swatches">${sw(HAIR_COLOURS, 'hairColour')}</div>
         <h4>Outfit</h4><div class="swatches">${sw(OUTFITS, 'outfit')}</div>
       </div>
@@ -1100,13 +1124,18 @@ function newGame() {
 }
 
 function startGame() {
+  ui.target = null; ui.tab = 'here'; ui.expanded = false;
   showScreen('game');
+  World.setAvatar(S.look, S.loc);
+  World.focus(S.loc, 62);
   render();
   if (S.over) showEnd();
   else processQueue();
 }
 
 function init() {
+  World.init($('#world'), $('#pins'));
+  World.onSelect(selectPlace);
   $('#newBtn').onclick = () => {
     const saved = load();
     if (!saved || saved.over) return showScreen('create');
