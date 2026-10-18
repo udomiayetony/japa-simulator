@@ -17,6 +17,7 @@ const World = (() => {
   let hemi, sun, rain = null, rainOn = false;
   let composer = null, bloomPass = null, quality = 'high', nightLevel = 0;
   const clouds = [];
+  const others = new Map(); // other live players: id -> { sprite, key, loc }
   const nightMats = [];
   const target = new THREE.Vector3(0, 0, 0);
   let dist = 110, goalTarget = null, goalDist = null;
@@ -903,6 +904,62 @@ const World = (() => {
     return new THREE.Vector3(wx(p.x) + 1.4, 0.12, wz(p.y) + 4);
   }
 
+  // ------------------------------------------------------------ other live players
+
+  // Other players are drawn as floating portrait cards around the place they are in.
+  const portraitTextures = new Map();
+  function portraitTexture(look) {
+    const key = JSON.stringify(look || {});
+    if (!portraitTextures.has(key)) {
+      const img = new Image();
+      const tex = new THREE.Texture(img);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      img.onload = () => { tex.needsUpdate = true; };
+      img.src = Avatar.portrait(look || {});
+      portraitTextures.set(key, tex);
+    }
+    return portraitTextures.get(key);
+  }
+  function hashAngle(id) {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return (h % 360) * (Math.PI / 180);
+  }
+  function setPlayers(list) {
+    const keep = new Set();
+    const counts = {};
+    for (const p of list.slice(0, 80)) {
+      if (!p || !p.id || !LOCATIONS[p.loc]) continue;
+      keep.add(p.id);
+      counts[p.loc] = (counts[p.loc] || 0) + 1;
+      const key = JSON.stringify(p.look || {});
+      let o = others.get(p.id);
+      if (!o || o.key !== key) {
+        if (o) root.remove(o.sprite);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: portraitTexture(p.look), transparent: true, depthWrite: false }));
+        sprite.scale.set(3.2, 3.2, 1);
+        sprite.renderOrder = 2;
+        root.add(sprite);
+        o = { sprite, key, loc: null };
+        others.set(p.id, o);
+      }
+      if (o.loc !== p.loc) {
+        o.loc = p.loc;
+        const L = LOCATIONS[p.loc];
+        const a = hashAngle(p.id) + counts[p.loc] * 0.7;
+        const r = 5 + (counts[p.loc] % 3) * 1.4;
+        o.sprite.position.set(wx(L.x) + Math.cos(a) * r, 2.2, wz(L.y) + Math.sin(a) * r * 0.8);
+      }
+    }
+    for (const [id, o] of others) if (!keep.has(id)) { root.remove(o.sprite); others.delete(id); }
+    for (const [id, el] of Object.entries(pins)) {
+      let badge = el.querySelector('.pin-count');
+      const n = counts[id] || 0;
+      if (n && !badge) { badge = document.createElement('span'); badge.className = 'pin-count'; el.appendChild(badge); }
+      if (badge) { if (n) badge.textContent = n > 99 ? '99+' : n; else badge.remove(); }
+    }
+  }
+
   // ------------------------------------------------------------ pins & labels
 
   function makePins() {
@@ -1079,6 +1136,7 @@ const World = (() => {
     }
     tickTraffic(dt);
     for (const s of spinners) s.rotation.z += dt * 0.06;
+    for (const o of others.values()) o.sprite.position.y = 2.2 + Math.sin(now / 600 + o.sprite.position.x) * 0.15;
     if (avatar) {
       if (avatarAnim) {
         const k = Math.min(1, (now - avatarAnim.start) / avatarAnim.ms);
@@ -1263,6 +1321,7 @@ const World = (() => {
       if (zoom) goalDist = zoom;
     },
     setTime,
+    setPlayers,
     getQuality: () => quality,
     setQuality(q) {
       try { localStorage.setItem(QUALITY_KEY, q); } catch (e) { /* storage unavailable */ }

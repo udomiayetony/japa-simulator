@@ -94,6 +94,8 @@ function newDay() {
 function weekly() {
   S.weekHours = 0;
   log('📅 New week. Bills are due.');
+  const rentIn = Online.weeklyRentIncome();
+  if (rentIn) { S.money += rentIn; S.stats.earned += rentIn; log(`🏘️ Rent from your properties: +${money(rentIn)}.`, 'good'); }
   if (S.allowance) { S.money += S.allowance; log(`💷 Pater's weekly allowance landed: +${money(S.allowance)}.`, 'good'); }
   if (S.rent) { S.money -= S.rent; S.stats.spent += S.rent; log(`🏠 Rent paid: -${money(S.rent)}.`, 'bad'); }
   if (S.debt > 0) {
@@ -206,6 +208,8 @@ function travelOptions(to) {
   const opts = [];
 
   let fare = (zmin === 1 ? 2.8 : 2.1) + 0.55 * (zmax - zmin) - (isPeak() ? 0 : 0.4);
+  const fareCut = Online.policy() === 'fare_freeze' ? 0.75 : 1; // Mayor's fare freeze
+  fare *= fareCut;
   if (from === 'heathrow' || to === 'heathrow') fare += 1.6;
   const cap = 8.9 + 1.6 * Math.max(0, zmax - 2);
   const tubeCost = round2(Math.max(0, Math.min(fare, cap - S.fares.tube)));
@@ -215,7 +219,7 @@ function travelOptions(to) {
     disabled: S.strike ? 'RMT strike: no Tube today' : !tubeOpen() ? 'Closed. Night Tube runs Fri & Sat only' : null,
   });
   opts.push({
-    mode: 'bus', label: '🚌 Bus', mins: Math.round(15 + d * 0.17), cost: round2(Math.max(0, Math.min(1.75, 5.25 - S.fares.bus))),
+    mode: 'bus', label: '🚌 Bus', mins: Math.round(15 + d * 0.17), cost: round2(Math.max(0, Math.min(1.75 * fareCut, 5.25 - S.fares.bus))),
     note: S.strike ? 'Rammed because of the strike' : 'Hopper fare',
   });
   const cycleMins = Math.round(5 + d * 0.09);
@@ -230,7 +234,7 @@ function travelOptions(to) {
   });
   const late = hour() >= 23 || hour() < 5;
   opts.push({
-    mode: 'cab', label: '🚕 Ubah', mins: Math.round(8 + d * 0.11), cost: Math.round((8 + d * 0.05) * (late ? 1.6 : 1)),
+    mode: 'cab', label: '🚕 Ubah', mins: Math.round(8 + d * 0.11), cost: Math.round((8 + d * 0.05) * (late ? 1.6 : 1)) + (Online.policy() === 'clean_air' ? 3 : 0),
     note: late ? 'Late-night surge' : 'Door to door',
   });
   for (const o of opts) if (!o.disabled && o.cost > S.money) o.disabled = 'Not enough money';
@@ -256,6 +260,7 @@ function travel(to, mode) {
   }
   if (mode === 'cycle' && S.weather === 'rain') fx({ hygiene: -8, fun: -3 });
   if (mode === 'walk' && S.weather === 'sun') fx({ fun: 4 });
+  if ((mode === 'walk' || mode === 'cycle') && Online.policy() === 'clean_air') fx({ fun: 3 });
   advance(mins);
   fx({ energy: -tiring });
   S.loc = to;
@@ -263,6 +268,7 @@ function travel(to, mode) {
   ui.tab = 'here';
   World.moveAvatar(to);
   World.focus(to);
+  Online.moveTo(to);
   log(`${o.label.split(' ')[0]} ${LOCATIONS[from].name} → ${LOCATIONS[to].name} (${mins} min${o.cost ? ', ' + money(o.cost) : ''}).${extra}`);
   afterAction();
 }
@@ -323,7 +329,7 @@ function maybePromote() {
 function workShift(hrs) {
   const j = JOBS[S.job];
   const factor = 0.75 + mood() / 400;
-  let pay = round2(hrs * jobLevel()[1] * factor);
+  let pay = round2(hrs * jobLevel()[1] * factor * (Online.policy() === 'wage_rise' ? 1.1 : 1));
   if (hrs >= 12) pay = round2(pay * 1.2);
   S.weekHours += hrs;
   S.stats.shifts++;
@@ -655,7 +661,7 @@ const EVENTS = {
 
 const RANDOM_EVENTS = {
   rentHike: {
-    cond: () => S.rent > 0, title: '🏠 Message from your landlord', text: '"Due to market conditions, rent is going up £15 a week from Monday. Thanks."',
+    cond: () => S.rent > 0 && Online.policy() !== 'rent_cap', title: '🏠 Message from your landlord', text: '"Due to market conditions, rent is going up £15 a week from Monday. Thanks."',
     choices: [
       { label: 'Accept it 😩', run: () => { S.rent += 15; return fx({ fun: -5 }); } },
       { label: 'Push back politely', run: () => { if (S.skills.charm >= 35) return ' Your charm worked. Rent stays the same!'; S.rent += 15; return ' They didn\'t budge.' + fx({ fun: -8 }); } },
@@ -857,7 +863,12 @@ function showEnd() {
 
 // ---------------------------------------------------------------- save
 
-function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }
+function save() {
+  if (!S) return;
+  S.savedAt = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ }
+  if (Online.signedIn()) Online.pushSave(S);
+}
 function load() { try { const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
 function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } }
 
@@ -874,7 +885,8 @@ function bar(label, v, cls = '') {
 function render() {
   if (!S) return;
   const w = WEATHER.find((x) => x.id === S.weather);
-  $('#clockPill').innerHTML = `<i class="dot"></i>Day ${Math.min(day(), GAME_DAYS)}/${GAME_DAYS} · ${DAYS[dow()]} ${clock()}`;
+  const live = Online.signedIn() ? ` · <span class="online-count">${Online.state.players.length.toLocaleString()} online</span>` : '';
+  $('#clockPill').innerHTML = `<i class="dot"></i>Day ${Math.min(day(), GAME_DAYS)}/${GAME_DAYS} · ${DAYS[dow()]} ${clock()}${live}`;
   $('#topActions').innerHTML = `
     <span class="pill money ${S.money < 0 ? 'neg' : ''}">💷 ${money(S.money)}</span>
     <button class="pill icon" id="helpBtn" aria-label="How to play">?</button>
@@ -887,6 +899,10 @@ function render() {
   if (S.debt > 0) chips.push(`💳 Debt ${money(S.debt)}`);
   if (S.visa) chips.push(S.visa.type === 'student' ? `🛂 Starter visa: ${Math.max(0, S.visa.expires - day())} days` : '🛂 Skilled Worker ✅');
   if (S.strike) chips.push('🚇 Tube strike');
+  const pol = Online.policy();
+  if (pol) chips.unshift(`${Online.POLICIES[pol].icon} ${Online.POLICIES[pol].label}`);
+  const hall = Online.state.hall;
+  if (hall && hall.mayor && hall.term.announcement) chips.unshift(`🏛️ Mayor @${esc(hall.mayor.username)}: ${esc(hall.term.announcement)}`);
   $('#chips').innerHTML = chips.map((c) => `<span class="pill chip">${c}</span>`).join('');
   const last = S.log[0];
   $('#ticker').innerHTML = last ? `<span>${esc(last.text)}</span>` : '';
@@ -915,14 +931,17 @@ function renderSheet() {
   const sheet = $('#sheet');
   sheet.classList.toggle('expanded', ui.expanded);
   if (ui.target && ui.target !== S.loc) return renderTravel(sheet);
-  const tabs = [['here', '📍 ' + (S.loc === S.home ? 'Home' : 'Here')], ['me', '🧍 Me'], ['story', '📖 Story']];
+  const tabs = [['here', '📍', S.loc === S.home ? 'Home' : 'Here'], ['me', '🧍', 'Me'], ['story', '📖', 'Story']];
+  if (Online.signedIn()) tabs.push(['chat', '💬', 'Chat'], ['people', '👥', 'People', Online.state.unread + Online.state.incoming.length], ['city', '🏛️', 'City']);
+  else if (['chat', 'people', 'city'].includes(ui.tab)) ui.tab = 'here';
   let body = '';
   if (ui.tab === 'here') body = hereHTML();
   else if (ui.tab === 'me') body = meHTML();
+  else if (LiveUI.TABS.includes(ui.tab)) body = LiveUI.tabHTML(ui.tab);
   else body = `<ol class="log">${S.log.slice(0, 40).map((l) => `<li class="${l.kind}"><time>${l.t}</time><span>${esc(l.text)}</span></li>`).join('')}</ol>`;
   sheet.innerHTML = `
     <button class="handle" id="sheetHandle" aria-label="${ui.expanded ? 'Collapse' : 'Expand'} panel"><i></i></button>
-    <nav class="tabs">${tabs.map(([id, label]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${label}</button>`).join('')}</nav>
+    <nav class="tabs">${tabs.map(([id, icon, label, badge]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}" aria-label="${label}">${icon}<span class="tab-text"> ${label}</span>${badge ? `<b class="badge">${badge}</b>` : ''}</button>`).join('')}</nav>
     <div class="sheet-body">${body}</div>`;
   $('#sheetHandle').onclick = () => { ui.expanded = !ui.expanded; renderSheet(); };
   sheet.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { ui.tab = b.dataset.tab; ui.expanded = ui.tab !== 'here' || ui.expanded; renderSheet(); }; });
@@ -930,6 +949,7 @@ function renderSheet() {
     const acts = placeActions(S.loc);
     sheet.querySelectorAll('[data-act]').forEach((b) => { b.onclick = () => runAction(acts[+b.dataset.act]); });
   }
+  if (LiveUI.TABS.includes(ui.tab)) LiveUI.bindTab(ui.tab, sheet);
 }
 
 const EARNS = /Work|Sell|Busk|Flip|Apply|Skilled Worker/;
@@ -1092,7 +1112,9 @@ function showScreen(id) {
 function showTitle() {
   const saved = load();
   $('#continueBtn').classList.toggle('hidden', !(saved && !saved.over));
+  Online.leaveCity();
   showScreen('title');
+  LiveUI.renderTitle();
 }
 
 const create = { name: '', bg: 'immigrant', country: null, countrySearch: '', look: { skin: 5, hair: 2, hairColour: 0, outfit: 0, head: 0, hatColour: 0, eyewear: 0, facial: 0, earrings: 0 } };
@@ -1214,6 +1236,10 @@ function newGame() {
   }[S.bg];
   log(intro);
   save();
+  if (Online.signedIn()) {
+    Online.updateProfile({ display_name: S.name, country: S.country, look: S.look, life: S.bg });
+    Online.pushSaveNow(S);
+  }
   startGame();
   showHelp();
 }
@@ -1223,6 +1249,10 @@ function startGame() {
   showScreen('game');
   World.setAvatar(S.look, S.loc);
   World.focus(S.loc, 62);
+  if (Online.signedIn()) {
+    Online.joinCity(S.loc);
+    Online.todaysHeadline().then((h) => { if (h && S) { log(`📰 Today in London: ${h}`); render(); } });
+  }
   render();
   if (S.over) showEnd();
   else processQueue();
@@ -1231,6 +1261,8 @@ function startGame() {
 function init() {
   World.init($('#world'), $('#pins'));
   World.onSelect(selectPlace);
+  Online.on(LiveUI.handle);
+  Online.init();
   $('#newBtn').onclick = () => {
     const saved = load();
     if (!saved || saved.over) return showScreen('create');
@@ -1239,8 +1271,13 @@ function init() {
     $('[data-close]').onclick = closeModal;
     $('#confirmNew').onclick = () => { clearSave(); closeModal(); showScreen('create'); };
   };
-  $('#continueBtn').onclick = () => {
+  $('#continueBtn').onclick = async () => {
     S = load();
+    // Signed-in players continue from whichever save is newer: this browser or the cloud.
+    if (Online.signedIn()) {
+      const cloud = await Online.pullSave();
+      if (cloud && !cloud.over && (!S || (cloud.savedAt || 0) > (S.savedAt || 0))) S = cloud;
+    }
     if (!S) return;
     if (!S.country) S.country = S.bg === 'immigrant' ? 'NG' : 'GB'; // saves from before the country picker
     startGame();

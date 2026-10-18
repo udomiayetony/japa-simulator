@@ -11,7 +11,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 window.THREE = { ...THREE_NS };
 window.FX = { EffectComposer, RenderPass, GTAOPass, UnrealBloomPass, OutputPass, RoomEnvironment };
 
-const SCRIPTS = ['js/data.js', 'js/avatar.js', 'js/game.js', 'js/world.js'];
+// Supabase powers Live London. If it cannot load, the game still plays offline.
+try {
+  window.SupabaseLib = await import('@supabase/supabase-js');
+} catch (e) {
+  console.warn('Live London unavailable, playing offline.', e);
+}
+
+const SCRIPTS = ['js/config.js', 'js/data.js', 'js/avatar.js', 'js/online.js', 'js/game.js', 'js/live-ui.js', 'js/world.js'];
 for (const src of SCRIPTS) {
   await new Promise((resolve, reject) => {
     const s = document.createElement('script');

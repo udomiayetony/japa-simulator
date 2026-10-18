@@ -2,7 +2,7 @@
 
 **Product:** London Hustle
 **Owner:** Tony Udomiaye
-**Status:** Phase 1 in build · Phases 2–3 planned · Phase 4 proposed (awaiting approval)
+**Status:** Phase 1 complete · Phase 2 in build (Supabase) · Phase 3 planned · Phase 4 approved (18 Oct 2026)
 **Last updated:** 18 October 2026
 
 ---
@@ -67,7 +67,7 @@ Check needs → choose a place → travel (time and money) → take an action (t
 
 Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have.
 
-### Phase 1: Single-player London (static site, no backend), building now
+### Phase 1: Single-player London (static site, no backend), complete
 
 | ID | Requirement | Priority |
 |---|---|---|
@@ -97,7 +97,7 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 | Q1 | Works at 390px phone width; no horizontal scrolling; readable in light and dark device modes. | P0 |
 | Q2 | Smooth on a mid-range phone (aim for 30+ fps). | P1 |
 
-### Phase 2: Live London (needs a backend: accounts, database, realtime)
+### Phase 2: Live London (Supabase: accounts, database, realtime), in build
 
 | ID | Requirement | Priority |
 |---|---|---|
@@ -109,6 +109,10 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 | L6 | Account types (player, creator, brand) so Phase 4 can build on them. | P1 |
 | L7 | Verified creator accounts and public player profiles (follower counts, reach), needed for brand collaborations. | P1 |
 | L8 | Daily headline written by an editor or generated, served from the API. | P2 |
+
+**Phase 2 build status (18 Oct 2026):** L1–L7 built and tested end to end against the live Supabase project (eu-west-2, London). L8 has a `headlines` table that the game reads; writing headlines is done in the Supabase dashboard for now.
+
+Known limits to fix before Phase 4 money flows: the in-game economy is still client-side (a determined player could edit their own save), so property prices and rent are game money only. Phase 4 earnings are based on reach and campaigns, not in-game money, but anything that pays out real money must be calculated on the server.
 
 ### Phase 3: Deeper life sim
 
@@ -124,7 +128,7 @@ Priority: **P0** must ship in the phase, **P1** should ship, **P2** nice to have
 | D8 | More cities: Manchester, Birmingham, plus "fly home" link-ups with other city games. | P2 |
 | D9 | Native app wrappers (iOS/Android). | P2 |
 
-### Phase 4: Brand marketplace (proposed, awaiting approval)
+### Phase 4: Brand marketplace (approved 18 Oct 2026)
 
 **Goal:** let businesses advertise inside London Hustle and collaborate with players, with players sharing in the revenue. Builds on Phase 2 accounts and profiles.
 
@@ -207,7 +211,7 @@ Splits apply to net revenue, after payment processing fees (roughly 2–3%). Bra
 
 ## 11. Open questions
 
-1. Should Phase 2 run on Supabase or Firebase?
+1. ~~Should Phase 2 run on Supabase or Firebase?~~ Decided: Supabase.
 2. Should the 60-day limit stay, or should the game become open-ended once multiplayer exists?
 3. Should we add a music partner or licensed soundtrack, as Lagos Life did?
 4. Phase 4: what weekly price should the first ad spaces launch at? (Suggestion: £50–£500 per week depending on location, reviewed after the first month of traffic data.)

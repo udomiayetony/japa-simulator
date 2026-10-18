@@ -28,6 +28,20 @@ Choose where you're from (about 50 countries, shown by flag), then one of three 
 - **Weekly bills**: rent every Monday, debt repayments and council tax. Two weeks in your overdraft and you're evicted.
 - **Endings and grades** with a shareable result card.
 
+## Live London (online)
+
+Sign up free to play with other Londoners. Online play adds:
+
+- **Cloud saves**: continue on any device.
+- **Live players**: see who's online and where they are on the map.
+- **Chat in every neighbourhood**, with reporting, blocking, rate limits and a banned-words filter.
+- **Friends and private messages** (friends only).
+- **Mayor of London elections**: stand, campaign and vote each week. The Mayor's policy changes the game for everyone (fare freeze, rent cap, wage rise or clean air zone) and they can post announcements to the whole city.
+- **Property market**: buy flats, houses and Thames plots that earn rent every Monday.
+- **Creators**: opt in to be discoverable by brands (the brand marketplace is Phase 4).
+
+Online play needs a Supabase project. The database lives in `supabase/migrations/` (every table has row level security), and the public URL and anon key go in `js/config.js`. Leave `supabaseUrl` empty to run fully offline.
+
 See [docs/PRD.md](docs/PRD.md) for the product plan, including the multiplayer roadmap.
 
 Progress saves automatically in your browser.
@@ -52,12 +66,16 @@ python3 -m http.server 8000
 ```
 index.html     page shell, HUD and screens
 style.css      all styling (responsive down to phone width)
-js/boot.js     loads Three.js and the game scripts
+js/boot.js     loads Three.js, Supabase and the game scripts
+js/config.js   public Supabase settings (URL and anon key)
+js/online.js   Live London: auth, cloud saves, presence, chat, friends, City Hall, property
+js/live-ui.js  screens for sign-up, chat, people and City Hall
 js/data.js     world data: places (real coordinates), Tube lines, jobs, headlines
 js/avatar.js   Memoji-style 3D characters and portraits
 js/game.js     engine: time, needs, travel, careers, events, endings, HUD
 js/world.js    the 3D city (Three.js): Thames, parks, landmarks, traffic, camera
 docs/PRD.md    product requirements
+supabase/      database migrations for Live London
 ```
 
 Brand names in the game are parodies. Place names and Tube lines are real London geography, simplified.
