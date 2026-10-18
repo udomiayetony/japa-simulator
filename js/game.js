@@ -81,6 +81,8 @@ function newDay() {
     oldmoney: { 2: 'paterCall', 15: 'cutOff' },
     newgen: { 2: 'debtIntro' },
   }[S.bg];
+  log(`📰 The Evening Hustle: ${HEADLINES[(d * 7) % HEADLINES.length]}`);
+  if (d % 3 === 0) log(TIPS[(d / 3) % TIPS.length]);
   if (scripted[d]) S.queue.push(scripted[d]);
   else if (d > 2 && chance(0.45)) {
     const ev = randomEvent();
@@ -286,8 +288,11 @@ function applyJob(id) {
   if (id === 'analyst' && S.bg === 'oldmoney') p += 0.15;
   if (chance(p)) {
     const old = S.job;
+    const oldTitle = old ? jobTitle() : '';
     S.job = id;
-    return `🎉 You got the job: ${j.title}! ${money(j.pay)}/hr.${old ? ` Goodbye, ${JOBS[old].title}.` : ''}${j.sponsor && S.visa && S.visa.type === 'student' ? ' They can SPONSOR your visa. Go to Lunar House in Croydon!' : ''}`;
+    S.jobLevel = 0;
+    S.jobShifts = 0;
+    return `🎉 You got the job: ${j.title}! ${money(j.pay)}/hr.${old ? ` Goodbye, ${oldTitle}.` : ''}${j.sponsor && S.visa && S.visa.type === 'student' ? ' They can SPONSOR your visa. Go to Lunar House in Croydon!' : ''}`;
   }
   return pick([
     '😞 "We\'ve decided to go with another candidate." Classic.',
@@ -296,14 +301,33 @@ function applyJob(id) {
   ]);
 }
 
+// Current rung of the career ladder: [title, pay, shifts needed, skill needs]
+function jobLevel() {
+  const levels = JOBS[S.job].levels;
+  return levels[Math.min(S.jobLevel || 0, levels.length - 1)];
+}
+function jobTitle() { return S.job ? jobLevel()[0] : 'Unemployed'; }
+
+function maybePromote() {
+  const levels = JOBS[S.job].levels;
+  const next = levels[(S.jobLevel || 0) + 1];
+  if (!next) return '';
+  const [title, pay, shifts, req = {}] = next;
+  const ready = S.jobShifts >= shifts && Object.keys(req).every((k) => S.skills[k] >= req[k]) && mood() > 40;
+  if (!ready) return '';
+  S.jobLevel = (S.jobLevel || 0) + 1;
+  S.stats.promotions = (S.stats.promotions || 0) + 1;
+  return ` 🎉 PROMOTED to ${title}! Now ${money(pay)}/hr.`;
+}
+
 function workShift(hrs) {
   const j = JOBS[S.job];
   const factor = 0.75 + mood() / 400;
-  let pay = round2(hrs * j.pay * factor);
+  let pay = round2(hrs * jobLevel()[1] * factor);
   if (hrs >= 12) pay = round2(pay * 1.2);
   S.weekHours += hrs;
   S.stats.shifts++;
-  const tip = S.job === 'barista' || S.job === 'rider' ? Math.round(Math.random() * 8) : 0;
+  const tip = ['barista', 'rider', 'guide', 'bartender'].includes(S.job) ? Math.round(Math.random() * 10) : 0;
   const lines = {
     rider: ['Got splashed by a bus on Camden High Street.', 'Someone tipped £5. Faith in humanity restored.', 'Delivered 14 orders of Peri Palace.'],
     barista: ['Wrote "Jon" on a cup for a man called Siobhan.', 'Made 212 oat flat whites.', 'A banker said "cheers mate" and meant it.'],
@@ -311,8 +335,13 @@ function workShift(hrs) {
     care: ['Mrs Patel told you about the Blitz again. You love her.', 'Long shift, but you made a real difference today.', 'Covered for a colleague who had to go to the GP.'],
     dev: ['Fixed a bug that turned out to be a missing semicolon.', 'Sat through a two-hour "quick sync".', 'Shipped a feature. The founder tweeted about it.'],
     analyst: ['Built a 90-tab spreadsheet. Nobody will read it.', 'Your MD said "good work". You\'ll remember it forever.', 'Ate dinner at your desk at 11pm.'],
+    guide: ['Told a tour group Big Ben is the bell, not the tower. Minds blown.', 'A tourist asked if the King lives in the London Eye.', 'Walked 14 miles round Westminster. Tips were good.'],
+    bartender: ['Made 60 espresso martinis before the 7.30 curtain.', 'A theatre crowd sang the whole musical at the bar.', 'Someone left a £20 tip on a £6 drink. Legend.'],
   }[S.job];
-  return `💼 Worked ${hrs}h as ${j.title}. ${pick(lines)}` + fx({ money: pay + tip, energy: -hrs * 3.5, fun: -hrs * 1.5, hustle: 1 });
+  S.jobShifts = (S.jobShifts || 0) + 1;
+  const title = jobTitle();
+  const out = `💼 Worked ${hrs}h as ${title}. ${pick(lines)}` + fx({ money: pay + tip, energy: -hrs * 3.5, fun: -hrs * 1.5, hustle: 1 });
+  return out + maybePromote();
 }
 
 // ---------------------------------------------------------------- NPC perks
@@ -386,9 +415,9 @@ function placeActions(loc) {
   }
 
   // Food
-  const chicken = ['peckham', 'brixton', 'woolwich', 'camden', 'stratford', 'croydon', 'soho'];
+  const chicken = ['peckham', 'brixton', 'woolwich', 'camden', 'stratford', 'croydon', 'soho', 'wembley', 'nottinghill'];
   if (chicken.includes(loc)) A.push(act('🍗 Chicken shop (£4.50)', { mins: 20, cost: 4.5, run: () => '🍗 Two wings, chips and a Rubicon. Peak London cuisine.' + fx({ hunger: 35, fun: 4, hygiene: -3 }) }));
-  if (['city', 'kingscross', 'oxford', 'southbank', 'canary', 'shoreditch', 'heathrow'].includes(loc)) {
+  if (['city', 'kingscross', 'oxford', 'southbank', 'canary', 'shoreditch', 'heathrow', 'westminster', 'covent', 'towerhill', 'kensington', 'battersea'].includes(loc)) {
     const price = loc === 'heathrow' ? 12 : 6.2;
     A.push(act(`🥪 Meal deal at Prest (${money(price)})`, { mins: 15, cost: price, run: () => '🥪 Sad desk-lunch sandwich. It did the job.' + fx({ hunger: 28 }) }));
   }
@@ -495,6 +524,42 @@ function placeActions(loc) {
     brixton: [
       act('🌮 Brixton Village food', { mins: 60, cost: 12, run: () => '🌮 Jerk chicken from Brixton Village. Elite.' + fx({ hunger: 45, fun: 10 }) }),
       act('🎶 Club night at the Academy', { mins: 240, cost: 25, disabled: h >= 21 || h < 2 ? null : 'Opens 9pm', run: () => '🎶 Danced till your legs gave up.' + fx({ fun: 40, social: 20, energy: -20, hygiene: -15 }) }),
+    ],
+    westminster: [
+      act('💂 Changing of the Guard', { mins: 60, disabled: h >= 10 && h < 12 ? null : 'Guards change 10am to noon', run: () => '💂 Bearskin hats, a brass band and 4,000 tourists filming it.' + fx({ fun: 18 }) }),
+      act('🏛️ Tour the Houses of Parliament', { mins: 120, cost: 33, disabled: openBetween(9, 17) ? null : 'Tours 9am to 5pm', run: () => '🏛️ Saw where laws are made. Someone was asleep on the green benches.' + fx({ fun: 15, charm: 2 }) }),
+      act('🦆 Feed ducks in St James\'s Park', { mins: 45, run: () => '🦆 A pelican stole your sandwich. Royal pelican, though.' + fx({ fun: 10 }) }),
+    ],
+    covent: [
+      act('🎻 Busk in the piazza', { mins: 180, run: () => { const e = Math.round(18 + S.skills.charm * 0.8 + Math.random() * 30); return `🎻 Busked in Covent Garden and made ${money(e)}.` + fx({ money: e, charm: 2, fun: 6, energy: -8 }); } }),
+      act('🤹 Watch the street performers', { mins: 60, run: () => '🤹 A man juggled knives on a unicycle. You gave him a pound.' + fx({ fun: 14, money: -1 }) }),
+      act('🎭 Royal Opera House matinee', { mins: 180, cost: 25, disabled: h >= 12 && h < 20 ? null : 'Shows noon to 8pm', run: () => '🎭 Ballet at the Opera House. You cried a bit.' + fx({ fun: 30, charm: 3 }) }),
+    ],
+    towerhill: [
+      act('👑 See the Crown Jewels', { mins: 150, cost: 35, disabled: openBetween(9, 17) ? null : 'Tower open 9am to 5pm', run: () => '👑 The Imperial State Crown sparkled. A raven judged you.' + fx({ fun: 28, charm: 1 }) }),
+      act('🌉 Walk across Tower Bridge', { mins: 40, run: () => '🌉 The bridge lifted for a tall ship while you watched. Proper London.' + fx({ fun: 12, energy: -3 }) }),
+    ],
+    greenwich: [
+      act('🔭 Stand on the Prime Meridian', { mins: 90, cost: 18, disabled: openBetween(10, 17) ? null : 'Observatory 10am to 5pm', run: () => '🔭 One foot in the east, one in the west. Took the photo everyone takes.' + fx({ fun: 18 }) }),
+      act('⛵ Explore the Cutty Sark', { mins: 90, cost: 20, run: () => '⛵ Walked under a 150-year-old tea clipper. Smelt of history and varnish.' + fx({ fun: 16, charm: 1 }) }),
+      act('🌳 View from Greenwich Park', { mins: 60, run: () => '🌳 The whole City skyline from the hill. Worth the climb.' + fx({ fun: sunny ? 18 : 10, energy: -5 }) }),
+    ],
+    nottinghill: [
+      act('🧥 Sell at Portobello Road', { mins: 180, disabled: dow() === 5 || dow() === 4 ? null : 'Market days: Friday and Saturday', run: () => { const e = Math.round((25 + S.skills.hustle * 1.3 + Math.random() * 35) * (S.perks.jade30 ? 1.4 : 1)); return `🧥 Sold vintage on Portobello Road: ${money(e)}.` + fx({ money: e, hustle: 2, energy: -10, social: 6 }); } }),
+      act('📸 Pastel houses photoshoot', { mins: 60, run: () => '📸 Posed in front of a pink house. So did 40 other people.' + fx({ fun: 10, charm: 1 }) }),
+    ],
+    kensington: [
+      act('🦕 Natural History Museum (free)', { mins: 150, disabled: openBetween(10, 18) ? null : 'Museums 10am to 6pm', run: () => '🦕 Said hello to the blue whale. Free culture!' + fx({ fun: 16, charm: 1 }) }),
+      act('🎼 The Proms, Royal Albert Hall', { mins: 180, cost: 8, disabled: h >= 18 && h < 21 ? null : 'Concerts 6pm to 9pm', run: () => '🎼 £8 standing ticket for a world-class orchestra. Best deal in London.' + fx({ fun: 32, charm: 3 }) }),
+      act('🛍️ Window shop at Harrods', { mins: 60, run: () => '🛍️ Saw a £4,000 handbag. Bought nothing. Left with dignity.' + fx({ fun: 6, energy: -3 }) }),
+    ],
+    wembley: [
+      act('⚽ England match at Wembley', { mins: 240, cost: 65, disabled: isWeekend() && h >= 14 && h < 20 ? null : 'Matches on weekend afternoons', run: () => chance(0.5) ? '⚽ England won! 90,000 people sang. You lost your voice.' + fx({ fun: 45, social: 25, energy: -15 }) : '⚽ England lost on penalties. Of course they did.' + fx({ fun: 10, social: 20, energy: -15 }) }),
+      act('🎤 Stadium gig', { mins: 240, cost: 85, disabled: h >= 18 && h < 22 ? null : 'Gigs start 6pm', run: () => '🎤 An Afrobeats star sold out Wembley. You sang every word.' + fx({ fun: 50, social: 25, energy: -20 }) }),
+    ],
+    battersea: [
+      act('🛗 Lift 109 up the chimney', { mins: 60, cost: 20, run: () => '🛗 Glass lift up a power station chimney. London at your feet.' + fx({ fun: 22 }) }),
+      act('🌳 Battersea Park walk', { mins: 60, run: () => '🌳 Walked past the Peace Pagoda and the boating lake.' + fx({ fun: sunny ? 16 : 9, energy: -4 }) }),
     ],
     croydon: [
       act('📦 Boxpark food & drinks', { mins: 90, cost: 14, run: () => '📦 Food and a pint at Boxpark Croydon.' + fx({ hunger: 40, fun: 10, social: 6 }) }),
@@ -763,7 +828,7 @@ function showEnd() {
   const share = `I played Japa Simulator: London Hustle as ${BACKGROUNDS[S.bg].name} and got "${head}" (grade ${g}). ${S.stats.tubeTrips} Tube rides, ${S.stats.pints} pints, net worth ${money(netWorth())}. Can you survive London?`;
   openModal(`
     <div class="end">
-      <div class="end-avatar">${avatarSVG(S.look, S.over.win ? 90 : 30)}</div>
+      <div class="end-avatar"><img class="avatar-img" src="${Avatar.portrait(S.look)}" alt=""></div>
       <p class="eyebrow">Day ${S.over.day} · ${esc(BACKGROUNDS[S.bg].name)}</p>
       <h2>${esc(head)}</h2>
       <p>${esc(body)}</p>
@@ -773,6 +838,7 @@ function showEnd() {
         <li><b>${S.stats.tubeTrips}</b>Tube rides</li>
         <li><b>${S.stats.busTrips}</b>bus rides</li>
         <li><b>${S.stats.shifts}</b>shifts worked</li>
+        <li><b>${S.stats.promotions || 0}</b>promotions</li>
         <li><b>${S.stats.pints}</b>pints</li>
         <li><b>${Object.values(S.rel).filter((r) => r >= 30).length}</b>close friends</li>
         ${S.bg === 'immigrant' ? `<li><b>${money(S.stats.sentHome)}</b>sent home</li>` : ''}
@@ -795,46 +861,6 @@ function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } cat
 function load() { try { const raw = localStorage.getItem(SAVE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
 function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } }
 
-// ---------------------------------------------------------------- avatar
-
-function avatarSVG(look, m = 70) {
-  const skin = SKIN[look.skin], hc = HAIR_COLOURS[look.hairColour], out = OUTFITS[look.outfit];
-  const mouth = m > 60 ? 'M44 55 Q50 61 56 55' : m > 35 ? 'M45 57 L55 57' : 'M44 59 Q50 53 56 59';
-  const orb = m > 60 ? '#38c172' : m > 35 ? '#f6c343' : '#e3342f';
-  const back = {
-    afro: `<circle cx="50" cy="38" r="22" fill="${hc}"/>`,
-    long: `<path d="M32 40 Q32 22 50 22 Q68 22 68 40 L70 74 L30 74 Z" fill="${hc}"/>`,
-    braids: `<path d="M33 40 Q33 23 50 23 Q67 23 67 40 L69 80 L63 80 L62 50 L38 50 L37 80 L31 80 Z" fill="${hc}"/>`,
-  }[look.hair] || '';
-  const front = {
-    afro: '',
-    short: `<path d="M35 42 Q35 26 50 26 Q65 26 65 42 Q60 33 50 33 Q40 33 35 42 Z" fill="${hc}"/>`,
-    bun: `<circle cx="50" cy="22" r="7" fill="${hc}"/><path d="M35 42 Q35 27 50 27 Q65 27 65 42 Q58 32 50 32 Q42 32 35 42 Z" fill="${hc}"/>`,
-    long: `<path d="M35 42 Q36 27 50 27 Q64 27 65 42 Q57 31 47 33 Q40 35 35 42 Z" fill="${hc}"/>`,
-    braids: `<path d="M35 41 Q36 27 50 27 Q64 27 65 41 Q57 32 50 32 Q43 32 35 41 Z" fill="${hc}"/>`,
-    bald: '',
-  }[look.hair] || '';
-  return `<svg viewBox="0 0 100 135" class="avatar" aria-hidden="true">
-    <ellipse cx="50" cy="130" rx="24" ry="4" fill="rgba(0,0,0,.15)"/>
-    <g class="bob">
-      <g class="orb"><path d="M50 2 L56 10 L50 18 L44 10 Z" fill="${orb}" stroke="rgba(0,0,0,.2)"/></g>
-      ${back}
-      <rect x="44" y="58" width="12" height="8" fill="${skin}"/>
-      <path d="M30 70 Q30 64 38 64 L62 64 Q70 64 70 70 L70 100 L30 100 Z" fill="${out}"/>
-      <rect x="22" y="66" width="9" height="30" rx="4.5" fill="${out}"/>
-      <rect x="69" y="66" width="9" height="30" rx="4.5" fill="${out}"/>
-      <circle cx="26.5" cy="98" r="4.5" fill="${skin}"/><circle cx="73.5" cy="98" r="4.5" fill="${skin}"/>
-      <rect x="35" y="99" width="12" height="25" rx="3" fill="#2d3748"/>
-      <rect x="53" y="99" width="12" height="25" rx="3" fill="#2d3748"/>
-      <rect x="33" y="122" width="15" height="6" rx="3" fill="#f7fafc"/><rect x="52" y="122" width="15" height="6" rx="3" fill="#f7fafc"/>
-      <circle cx="50" cy="44" r="16" fill="${skin}"/>
-      ${front}
-      <circle cx="44" cy="45" r="1.8" fill="#1a202c"/><circle cx="56" cy="45" r="1.8" fill="#1a202c"/>
-      <path d="${mouth}" stroke="#1a202c" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-    </g>
-  </svg>`;
-}
-
 // ---------------------------------------------------------------- HUD over the 3D city
 
 const ui = { tab: 'here', target: null, expanded: false };
@@ -856,7 +882,7 @@ function render() {
   const chips = [
     `${w.icon} ${w.label}`,
     `🏠 Rent ${money(S.rent)}/wk`,
-    `💼 ${S.job ? esc(JOBS[S.job].title.split(',')[0].split(' (')[0]) : 'Unemployed'}`,
+    `💼 ${esc(jobTitle())}`,
   ];
   if (S.debt > 0) chips.push(`💳 Debt ${money(S.debt)}`);
   if (S.visa) chips.push(S.visa.type === 'student' ? `🛂 Visa: ${Math.max(0, S.visa.expires - day())} days` : '🛂 Skilled Worker ✅');
@@ -868,7 +894,7 @@ function render() {
 
   const [mEmoji, mText] = moodLabel(mood());
   $('#dock').innerHTML = `
-    <button class="me-chip" id="meChip" aria-label="Your stats">${avatarSVG(S.look, mood())}<span><b>${esc(S.name)}</b><small>${mEmoji} ${mText}</small></span></button>
+    <button class="me-chip" id="meChip" aria-label="Your stats"><img class="avatar-img" src="${Avatar.portrait(S.look)}" alt=""><span><b>${esc(S.name)}</b><small>${mEmoji} ${mText}</small></span></button>
     <div class="rings">${Object.keys(S.needs).map((k) => {
       const v = Math.round(S.needs[k]);
       const col = v < 25 ? 'var(--bad)' : v < 50 ? 'var(--amber)' : 'var(--green)';
@@ -1057,22 +1083,39 @@ function showTitle() {
   showScreen('title');
 }
 
-const create = { name: '', bg: 'immigrant', look: { skin: 4, hair: 0, hairColour: 0, outfit: 0 } };
+const create = { name: '', bg: 'immigrant', look: { skin: 5, hair: 2, hairColour: 0, outfit: 0, head: 0, hatColour: 0, eyewear: 0, facial: 0, earrings: 0 } };
 const NAMES = ['Tunde', 'Amara', 'Ifeoma', 'Kwame', 'Zainab', 'Femi', 'Chioma', 'Dami', 'Ngozi', 'Seyi'];
+const LOOK_LABELS = {
+  hair: { short: 'Short', fade: 'Fade', afro: 'Afro', puffs: 'Puffs', braids: 'Braids', locs: 'Locs', bob: 'Bob', long: 'Long', curly: 'Curly', bun: 'Bun', mohawk: 'Mohawk', bald: 'Bald' },
+  head: { none: 'None', beanie: 'Beanie', cap: 'Cap', bucket: 'Bucket hat', beret: 'Beret', gele: 'Gele', hijab: 'Hijab', turban: 'Turban' },
+  eyewear: { none: 'None', round: 'Round', square: 'Square', shades: 'Shades' },
+  facial: { none: 'None', stubble: 'Stubble', goatee: 'Goatee', moustache: 'Moustache', beard: 'Beard' },
+  earrings: { none: 'None', studs: 'Studs', hoops: 'Hoops' },
+};
+const LOOK_LISTS = { hair: HAIR, head: HEADWEAR, eyewear: EYEWEAR, facial: FACIAL, earrings: EARRINGS };
 
 function renderCreate() {
   if (!create.name) create.name = pick(NAMES);
-  const sw = (arr, key) => arr.map((c, i) => `<button class="swatch ${create.look[key] === i ? 'on' : ''}" style="background:${c}" data-look="${key}" data-i="${i}" aria-label="${key} ${i + 1}"></button>`).join('');
+  const L = create.look;
+  const sw = (arr, key) => arr.map((c, i) => `<button class="swatch ${L[key] === i ? 'on' : ''}" style="background:${c}" data-look="${key}" data-i="${i}" aria-label="${key} ${i + 1}"></button>`).join('');
+  const chips = (key) => LOOK_LISTS[key].map((v, i) => `<button class="chip-btn ${L[key] === i ? 'on' : ''}" data-look="${key}" data-i="${i}">${LOOK_LABELS[key][v]}</button>`).join('');
+  const scroll = $('.create-card') ? $('.create-card').scrollTop : 0;
   $('#create-body').innerHTML = `
     <div class="create-grid">
       <div class="preview">
-        ${avatarSVG(lookFromCreate(), 80)}
+        <img class="avatar-img big" src="${Avatar.portrait(lookFromCreate())}" alt="Your character">
+        <button class="btn white small-btn" id="randomBtn">🎲 Surprise me</button>
         <label class="field"><span>Name</span><input id="nameInput" maxlength="16" value="${esc(create.name)}"></label>
       </div>
       <div class="looks">
         <h4>Skin</h4><div class="swatches">${sw(SKIN, 'skin')}</div>
-        <h4>Hair</h4><div class="swatches">${HAIR.map((h, i) => `<button class="chip-btn ${create.look.hair === i ? 'on' : ''}" data-hair="${i}">${h}</button>`).join('')}</div>
+        <h4>Hair</h4><div class="swatches">${chips('hair')}</div>
         <h4>Hair colour</h4><div class="swatches">${sw(HAIR_COLOURS, 'hairColour')}</div>
+        <h4>Headwear</h4><div class="swatches">${chips('head')}</div>
+        ${L.head ? `<h4>Headwear colour</h4><div class="swatches">${sw(HAT_COLOURS, 'hatColour')}</div>` : ''}
+        <h4>Glasses</h4><div class="swatches">${chips('eyewear')}</div>
+        <h4>Facial hair</h4><div class="swatches">${chips('facial')}</div>
+        <h4>Earrings</h4><div class="swatches">${chips('earrings')}</div>
         <h4>Outfit</h4><div class="swatches">${sw(OUTFITS, 'outfit')}</div>
       </div>
     </div>
@@ -1085,15 +1128,28 @@ function renderCreate() {
         <p class="bg-goal">🏆 ${b.goal}</p>
         <span class="bg-stats">Start: ${money(b.money)}${b.debt ? ` · Debt ${money(b.debt)}` : ''} · Rent ${b.rent ? money(b.rent) + '/wk' : 'paid by Pater'}</span>
       </button>`).join('')}</div>`;
-  document.querySelectorAll('[data-look]').forEach((b) => { b.onclick = () => { create.look[b.dataset.look] = +b.dataset.i; renderCreate(); }; });
-  document.querySelectorAll('[data-hair]').forEach((b) => { b.onclick = () => { create.look.hair = +b.dataset.hair; renderCreate(); }; });
+  if ($('.create-card')) $('.create-card').scrollTop = scroll;
+  document.querySelectorAll('[data-look]').forEach((b) => { b.onclick = () => { L[b.dataset.look] = +b.dataset.i; renderCreate(); }; });
   document.querySelectorAll('[data-bg]').forEach((b) => { b.onclick = () => { create.bg = b.dataset.bg; renderCreate(); }; });
+  $('#randomBtn').onclick = () => {
+    const r = (n) => Math.floor(Math.random() * n);
+    Object.assign(L, {
+      skin: r(SKIN.length), hair: r(HAIR.length), hairColour: Math.random() < 0.8 ? r(6) : r(HAIR_COLOURS.length), outfit: r(OUTFITS.length),
+      head: Math.random() < 0.5 ? 0 : r(HEADWEAR.length), hatColour: r(HAT_COLOURS.length), eyewear: Math.random() < 0.6 ? 0 : r(EYEWEAR.length),
+      facial: Math.random() < 0.6 ? 0 : r(FACIAL.length), earrings: Math.random() < 0.6 ? 0 : r(EARRINGS.length),
+    });
+    renderCreate();
+  };
   $('#nameInput').oninput = (e) => { create.name = e.target.value; };
 }
 
-// The avatar renderer expects hair as a style name; creation stores the index.
+// Creation stores list positions; the saved look uses names for the style options.
 function lookFromCreate() {
-  return { skin: create.look.skin, hair: HAIR[create.look.hair], hairColour: create.look.hairColour, outfit: create.look.outfit };
+  const L = create.look;
+  return {
+    skin: L.skin, hair: HAIR[L.hair], hairColour: L.hairColour, outfit: L.outfit,
+    head: HEADWEAR[L.head], hatColour: L.hatColour, eyewear: EYEWEAR[L.eyewear], facial: FACIAL[L.facial], earrings: EARRINGS[L.earrings],
+  };
 }
 
 function newGame() {
@@ -1104,11 +1160,11 @@ function newGame() {
     t: 8 * 60, loc: create.bg === 'immigrant' ? 'heathrow' : B.home, home: B.home,
     money: B.money, debt: B.debt, rent: B.rent, allowance: create.bg === 'oldmoney' ? 400 : 0,
     needs: { hunger: 70, energy: create.bg === 'immigrant' ? 45 : 75, fun: 65, social: 55, hygiene: create.bg === 'immigrant' ? 50 : 80 },
-    skills: { ...B.skills }, job: null, weekHours: 0, groceries: create.bg === 'immigrant' ? 0 : 3, outfit: create.bg === 'oldmoney', family: 60,
+    skills: { ...B.skills }, job: null, jobLevel: 0, jobShifts: 0, weekHours: 0, groceries: create.bg === 'immigrant' ? 0 : 3, outfit: create.bg === 'oldmoney', family: 60,
     visa: create.bg === 'immigrant' ? { type: 'student', expires: 35 } : null,
     rel: { chidi: create.bg === 'immigrant' ? 10 : 0, jade: create.bg === 'newgen' ? 20 : 0, tom: create.bg === 'oldmoney' ? 20 : 0, priya: 0 },
     perks: {}, flags: {}, weather: 'grey', strike: false, fares: { tube: 0, bus: 0 }, overdraftWeeks: 0,
-    stats: { tubeTrips: 0, busTrips: 0, earned: 0, spent: 0, sentHome: 0, shifts: 0, pints: 0 },
+    stats: { tubeTrips: 0, busTrips: 0, earned: 0, spent: 0, sentHome: 0, shifts: 0, pints: 0, promotions: 0 },
     log: [], queue: [], cooldown: {}, over: null,
   };
   S.weather = rollWeather();

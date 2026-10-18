@@ -52,6 +52,10 @@ input::placeholder { color: var(--muted); }
 .pin.here .pin-bubble { border-color: var(--green); box-shadow: 0 0 0 4px rgba(32, 178, 107, .3), 0 3px 10px rgba(0, 0, 0, .25); }
 .pin.selected .pin-bubble { border-color: #111; transform: scale(1.2); }
 .pin:focus { outline: none; }
+.mon-label {
+  position: absolute; left: 0; top: 0; margin-left: -60px; width: 120px; text-align: center; pointer-events: none;
+  font-size: 10.5px; font-weight: 700; color: #2f3a2a; text-shadow: 0 1px 0 rgba(255,255,255,.9), 0 0 6px rgba(255,255,255,.9); white-space: nowrap;
+}
 
 /* ------------------------------------------------ shared pieces */
 .screen { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
@@ -111,7 +115,12 @@ button.pill { cursor: pointer; }
 .create-card h4 { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .create-grid { display: grid; grid-template-columns: 210px 1fr; gap: 22px; align-items: start; }
 .preview { background: linear-gradient(#e2efd4, #f4f6ef); border-radius: 20px; padding: 12px; text-align: center; }
-.preview .avatar { width: 140px; height: 190px; }
+.preview { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.avatar-img { display: block; }
+.avatar-img.big { width: 190px; height: 190px; animation: float 3s ease-in-out infinite; }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.small-btn { padding: 8px 14px; font-size: 13px; }
+.preview .field { width: 100%; }
 .field { display: flex; flex-direction: column; gap: 4px; text-align: left; font-weight: 700; font-size: 13px; }
 .field input { font: inherit; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); -webkit-text-fill-color: var(--ink); }
 .field input:focus { outline: none; border-color: var(--green); }
@@ -158,7 +167,7 @@ button.pill { cursor: pointer; }
   display: flex; align-items: center; gap: 8px; border: 0; background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-radius: 999px; padding: 4px 14px 4px 4px; box-shadow: var(--shadow); cursor: pointer; text-align: left; min-width: 0;
 }
-.me-chip .avatar { width: 34px; height: 44px; background: #e9f3e1; border-radius: 999px; }
+.me-chip .avatar-img { width: 40px; height: 40px; background: #e9f3e1; border-radius: 999px; object-fit: cover; }
 .me-chip span { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .me-chip b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .me-chip small { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
@@ -225,11 +234,6 @@ button.pill { cursor: pointer; }
 .log li.good { color: var(--green-dark); font-weight: 600; }
 .log li.bad { color: #b8392f; }
 
-/* ------------------------------------------------ avatar (2D, used in menus) */
-.avatar .bob { animation: bob 2.4s ease-in-out infinite; transform-origin: 50% 100%; }
-.avatar .orb { animation: spin 3s ease-in-out infinite; transform-origin: 50px 10px; }
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
-@keyframes spin { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.4); } }
 
 /* ------------------------------------------------ modal & toast */
 .modal { position: fixed; inset: 0; background: rgba(30, 45, 25, .4); display: grid; place-items: center; padding: 16px var(--gutter-r) 16px var(--gutter-l); z-index: 50; }
@@ -255,7 +259,7 @@ button.pill { cursor: pointer; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
 
 .end { text-align: center; }
-.end-avatar .avatar { width: 110px; height: 150px; }
+.end-avatar .avatar-img { width: 150px; height: 150px; margin: 0 auto; }
 .eyebrow { text-transform: uppercase; letter-spacing: .1em; font-size: 12px; font-weight: 800; color: var(--green-dark); margin: 0 0 6px; }
 .grade { display: inline-flex; flex-direction: column; align-items: center; background: #111; color: #fff; border-radius: 20px; padding: 8px 24px; margin: 6px 0 12px; }
 .grade b { font-size: 44px; font-weight: 800; line-height: 1; color: #6ee7a8; }
@@ -291,6 +295,6 @@ button.pill { cursor: pointer; }
   .actions { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .avatar .bob, .avatar .orb, .modal-card { animation: none; }
+  .avatar-img.big, .modal-card { animation: none; }
   .sheet { transition: none; }
 }

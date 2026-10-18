@@ -1,0 +1,14 @@
+{
+  "name": "Japa Simulator: London Hustle",
+  "short_name": "London Hustle",
+  "description": "A free 3D life sim about surviving 60 days in London.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#cfe0b4",
+  "theme_color": "#20b26b",
+  "categories": ["games", "entertainment"],
+  "lang": "en-GB",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
