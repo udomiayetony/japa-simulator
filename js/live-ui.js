@@ -36,18 +36,15 @@ const LiveUI = (() => {
         <button class="link-btn" id="signOutBtn">Sign out</button>`;
       $('#signOutBtn').onclick = async () => { await Online.signOut(); renderTitle(); };
     } else {
-      el.innerHTML = `<p>Play with other Londoners: live chat, friends and Mayor elections.</p>
-        <div class="row"><button class="btn green" id="signUpBtn">Sign up free</button><button class="btn white" id="logInBtn">Log in</button></div>`;
-      $('#signUpBtn').onclick = () => showAuth('signup');
-      $('#logInBtn').onclick = () => showAuth('login');
+      el.innerHTML = '<p>A free account keeps your Londoner safe in the cloud and puts you in the city with everyone else. You must be 18 or older.</p>';
     }
   }
 
   function showAuth(mode) {
     const signup = mode === 'signup';
     openModal(`
-      <h2>${signup ? 'Join Live London' : 'Welcome back'}</h2>
-      <p>${signup ? 'Free. Your game saves to the cloud, and you can chat, make friends and vote for Mayor.' : 'Log in to pick up where you left off.'}</p>
+      <h2>${signup ? 'Create your account' : 'Welcome back'}</h2>
+      <p>${signup ? 'Free. Your Londoner saves to the cloud, and you can chat, make friends and vote for Mayor.' : 'Log in to pick up where you left off.'}</p>
       <form id="authForm" class="form" novalidate>
         <label class="field"><span>Email</span><input id="authEmail" type="email" autocomplete="email" required></label>
         <label class="field"><span>Password</span><input id="authPassword" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="8" required></label>
@@ -76,7 +73,7 @@ const LiveUI = (() => {
       const btn = e.target.querySelector('button[type="submit"]');
       btn.disabled = true;
       if (signup) {
-        if (!$('#authAdult').checked) { btn.disabled = false; return err('You must be 18 or older to play online.'); }
+        if (!$('#authAdult').checked) { btn.disabled = false; return err('You must be 18 or older to play.'); }
         const res = await Online.signUp(email, password, true);
         btn.disabled = false;
         if (res.error) return err(Online.errText(res.error));

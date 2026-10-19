@@ -18,7 +18,7 @@ window.SupabaseReady = import('@supabase/supabase-js')
   .catch((e) => console.warn('Live London unavailable, playing offline.', e));
 
 // Fetch every game script at once but run them in order.
-const SCRIPTS = ['js/config.js', 'js/data.js', 'js/avatar.js', 'js/online.js', 'js/game.js', 'js/coach.js', 'js/home.js', 'js/live-ui.js', 'js/world.js'];
+const SCRIPTS = ['js/config.js', 'js/data.js', 'js/avatar.js', 'js/online.js', 'js/game.js', 'js/coach.js', 'js/home.js', 'js/onboard.js', 'js/music.js', 'js/live-ui.js', 'js/world.js'];
 await Promise.all(SCRIPTS.map((src) => new Promise((resolve, reject) => {
   const s = document.createElement('script');
   s.src = src;

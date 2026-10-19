@@ -3,7 +3,7 @@
 **Product:** London Hustle
 **Owner:** Tony Udomiaye
 **Status:** Phase 1 complete · Better than Lagos Life batch built (18 Oct 2026) · Phase 2 in build (Supabase) · Phase 3 planned · Phase 4 approved (18 Oct 2026)
-**Last updated:** 18 October 2026
+**Last updated:** 19 October 2026
 
 ---
 
@@ -153,6 +153,26 @@ Approved by Tony on 18 Oct 2026: A1–A3, B1–B3, C1–C3 and D1–D6. Not appr
 | D4 | A real London calendar. The game starts on the real date you start playing and follows the calendar: London Marathon, Pride, Notting Hill Carnival (August bank holiday weekend), Halloween, Bonfire Night fireworks over Battersea Park, Christmas lights on Oxford Street (with the Trafalgar Square tree), Winter Wonderland, Christmas Day (no Tube or buses), Boxing Day sales and New Year's Eve fireworks over the Thames. Each event has an announcement, something to do at its place and 3D visuals. | Built |
 | D5 | Speed: the city appears fast, then adds detail as you play. The core city (river, parks, roads, the 24 places) draws first; landmarks, stations, bridges, railways, filler buildings, traffic, trains and people stream in over the next frames; glow and shading switch on once everything has loaded. Game scripts download in parallel and Supabase no longer delays the start. Measured with software rendering (no graphics chip): title in under 1 second, first 3D frame in 2.0–2.5 seconds on a phone-sized screen. | Built |
 | D6 | Accessibility: a Bigger text option, colour-blind-safe need rings and bars (blue and orange with a "!" when low), full keyboard play (arrows or WASD to move the map, + and - to zoom, P for a list of places, 1–9 for actions, H for hints, M for the menu, Esc to close), visible focus outlines, screen-reader labels on the need rings, and reduced motion when the device asks for it. | Built |
+
+### Onboarding and home, like Lagos Life (approved and built, 19 Oct 2026)
+
+Approved by Tony on 19 Oct 2026: O0–O8, with an account required and a lottery for the starting life.
+
+| ID | Requirement | Status |
+|---|---|---|
+| O0 | **Account first.** The title screen shows Sign up free and Log in; a new life starts after signing up (18+ confirmed) and choosing a username. Without Supabase settings (the offline preview) the game plays without an account. | Built |
+| O1 | **Five-step setup** with a progress bar: Look → Personality → Dream → Birth lottery → Home. The full-body character stands on the left and can be dragged to spin; every step has Back, 🔀 randomise and Next. | Built |
+| O2 | **Richer looks:** body (woman or man), outfit style (casual, hoodie, office, gym, hi-vis) and fabric (plain, Ankara, Kente, tartan, pinstripe), on top of skin, hair, colours, headwear, glasses, facial hair and earrings. | Built |
+| O3 | **Personality:** pick 2 of 8 traits with real effects. Hustler (Hustle ×1.5, promoted 2 shifts sooner), Foodie (food fills 25% more, +4 fun), Party Animal (fun ×1.25 but drains 20% faster), Gym Rat (energy lasts 15% longer, hygiene drops 15% faster), Smooth Talker (Charm ×1.5, social ×1.25), Lazy Bones (energy lasts 25% longer, pay −8%), Clean Freak (hygiene drops 30% slower), Night Owl (late nights cost 30% less energy, fun ×1.3 after 8pm). | Built |
+| O4 | **Dream:** a long-term goal on top of the life goal: Top of the Ladder (top level of any career), On the Property Ladder (£15,000 net worth), Everyone's Mate (4 friends at 60+), Shoreditch Unicorn (pitch your startup and get funded: needs Coding 60 and Charm 40), Proper Londoner (visit all 24 places). A dream achieved adds 700 points and shows on the ending card. | Built |
+| O5 | **Birth lottery:** Fresh Immigrant, Old Money or New Gen is drawn by the server once per account (40% / 20% / 40%) and never changes, even when starting a new life. Players can't pick or change it (database function `draw_birth`, column `profiles.birth`). Immigrants then pick the country they moved from; others pick their family roots. | Built |
+| O6 | **Choose where to live:** house share (Woolwich), student halls (King's Cross), family council flat (Peckham, New Gen), studio (Brixton), one-bed (Stratford) and a mansion flat (Chelsea, Old Money). Each has its own rent and deposit, so starting money differs; homes you can't afford show "Work your way here". | Built |
+| O7 | **Start inside your home.** The game opens in your 3D room with "Welcome to London! Quick tour, under one minute" (Start or Skip). Tap the bed, kitchen, shower, phone, telly, sofa or desk to use them, or the door to go outside. A four-step tour follows (cook, go outside, travel, apply for a job). Cards down the left show the next goal, the most urgent need, your dream and your streak. The bottom has four tabs: **Home, Map, Shop** (furniture, paint, outfits) and **Phone** (Me, Story, Hints, Places, Chat, People, City Hall, Settings). Coming home takes you back inside. | Built |
+| O8 | **Background music:** soft music made live in the browser (our own, not a recording), a 🔊 toggle in the top bar (in Settings on phones), remembered per player. It starts after the first tap because browsers block sound until then. | Built |
+
+### Proposed next: street-level walking (not approved yet)
+
+Lagos Life's "Go outside" switches to a third-person street view: your character walks real streets (from OpenStreetMap) with a joystick, other players walk past with name tags, a minimap sits in the corner and "Walk there" directions guide you. This is a large feature and is waiting for approval.
 
 ### Phase 3: Deeper life sim
 

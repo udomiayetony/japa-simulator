@@ -227,72 +227,116 @@ const Coach = (() => {
 
   // ------------------------------------------------------------ guided start
 
-  const TUT_TARGET = { immigrant: 'woolwich', oldmoney: 'oxford', newgen: 'brixton' };
-  const TUT_REASON = { immigrant: 'your new room is', oldmoney: 'the shops and lunch are', newgen: 'the best food is' };
+  // A welcome card, then four steps: cook at home, go outside, travel, apply for a job.
+  const tutJob = () => (S.bg === 'immigrant' ? 'care' : bestJob() || 'barista');
   function tutStep() { return S && S.tut && !S.tut.done ? S.tut.step : -1; }
   function tutText() {
-    const t = TUT_TARGET[S.bg], name = LOCATIONS[t].name;
     switch (tutStep()) {
-      case 0: return `Tap <b>${esc(name)}</b> on the map. That's where ${TUT_REASON[S.bg]}. Drag to move around, pinch or scroll to zoom.`;
-      case 1: return 'Pick how to get there. The <b>🚇 Tube</b> is quick, buses are cheap and walking is free. Watch your journey on the map.';
-      case 2: return 'Every trip uses energy and hunger. <b>Eat something</b>: tap a food action in the list below.';
-      case 3: {
-        const j = S.bg === 'immigrant' ? 'care' : bestJob() || 'barista';
-        return `Last step: <b>apply for a job</b>. ${esc(JOBS[j].title)} is hiring in ${esc(LOCATIONS[JOBS[j].place].name)} (interviews 9am to 6pm). Go there and tap 📝 Apply.`;
+      case 0: return ui.view === 'room'
+        ? 'You\'re hungry after the move. Tap the <b>🍳 Kitchen</b> and cook a meal.'
+        : 'You\'re hungry. <b>Eat something</b>: tap a food action in the list below.';
+      case 1: return 'Now see London. Tap <b>🚪 Go outside</b>.';
+      case 2: {
+        const J = JOBS[tutJob()];
+        return `${esc(J.title)} is hiring in <b>${esc(LOCATIONS[J.place].name)}</b>. Tap it on the map, then pick how to get there. The 🚇 Tube is quick, walking is free.`;
       }
+      case 3: return 'Last step: tap <b>📝 Apply</b> for the job. Interviews run 9am to 6pm and go better when you\'re clean and happy.';
       default: return '';
     }
   }
-  function tutTarget() {
-    const st = tutStep();
-    if (st === 0) return TUT_TARGET[S.bg];
-    if (st === 3) { const j = S.bg === 'immigrant' ? 'care' : bestJob() || 'barista'; return JOBS[j].place; }
-    return null;
-  }
   function advanceTut(to) {
     if (tutStep() < 0) return;
-    S.tut.step = to;
-    if (to >= 4) finishTut(true);
+    S.tut.step = Math.max(S.tut.step, to);
+    if (S.tut.step >= 4) finishTut(true);
   }
   function finishTut(completed) {
     S.tut = { done: true };
     save();
-    if (completed) toast('🎉 You\'re set! The 🎯 tracker shows your next goal.');
+    if (completed) toast('🎉 You\'re set! The 🎯 card shows your next goal.');
     render();
     setTimeout(checkDaily, 600);
   }
   function event(kind, data) {
     const st = tutStep();
-    if (st < 0) return;
-    if (st === 0 && kind === 'select' && data !== S.loc) advanceTut(1);
-    else if (st <= 1 && kind === 'travel') advanceTut(FOOD.test(placeActions(data.to).map((a) => a.label).join(' ')) ? 2 : 3);
-    else if (st === 2 && kind === 'action' && FOOD.test(data.label)) advanceTut(3);
-    else if (st === 3 && kind === 'action' && /Apply:/.test(data.label)) advanceTut(4);
+    if (st < 0 || S.tut.welcome) return;
+    if (st === 0 && kind === 'action' && FOOD.test(data.label)) advanceTut(1);
+    else if (st <= 1 && kind === 'view' && data === 'city') advanceTut(2);
+    else if (st <= 2 && kind === 'travel') advanceTut(3);
+    else if (kind === 'action' && /Apply:/.test(data.label)) advanceTut(4);
+  }
+
+  // Cards down the left: the next goal, what you need most right now, your dream and streak.
+  function needCard() {
+    const n = S.needs, room = ui.view === 'room';
+    const low = Object.keys(n).filter((k) => n[k] < 35).sort((a, b) => n[a] - n[b])[0];
+    if (!low) return null;
+    const home = S.loc === S.home;
+    const c = {
+      hunger: ['🍔', 'Eat something', home ? 'Tap the kitchen' : 'Find food nearby', 'kitchen'],
+      energy: ['😴', 'Get some sleep', home ? 'Tap the bed' : 'Head home to sleep', 'bed'],
+      hygiene: ['🚿', 'Have a shower', home ? 'Tap the shower' : 'Head home to shower', 'shower'],
+      fun: ['🎉', 'Have some fun', home ? 'Tap your phone or the telly' : 'Go and do something fun', 'me'],
+      social: ['💬', 'See people', home ? 'Tap your phone to call someone' : 'Hang out with a friend', 'me'],
+    }[low];
+    return { icon: c[0], title: c[1], sub: c[2], act: () => (room && home ? Home.tapHot(c[3]) : openHints()) };
+  }
+  function renderTasks() {
+    const box = $('#tasks');
+    if (!box) return;
+    const cards = [];
+    if (tutStep() < 0) {
+      const steps = goalSteps();
+      const i = steps.findIndex(([, done]) => !done);
+      cards.push(i < 0
+        ? { icon: '🏆', title: 'Goal reached!', sub: 'Hold on to it until day 60', act: openHints, cls: 'done' }
+        : { icon: '🎯', title: steps[i][0], sub: `Next goal · step ${i + 1} of ${steps.length}`, act: openHints, id: 'goalPill' });
+    }
+    const need = needCard();
+    if (need) cards.push(need);
+    if (S.dream && !S.flags.dreamDone) {
+      const [v, max, label] = dreamProgress();
+      cards.push({ icon: DREAMS[S.dream].icon, title: DREAMS[S.dream].name, sub: label, pct: (100 * v) / max, act: () => { ui.tab = 'me'; ui.expanded = true; render(); } });
+    }
+    const st = dailyState();
+    if (st.streak > 1 && st.last === isoDate(new Date())) cards.push({ icon: '🔥', title: `${st.streak}-day streak`, sub: 'Come back tomorrow', act: null, cls: 'small' });
+    box.innerHTML = cards.map((c, i) => `<button class="task ${c.cls || ''}" data-task="${i}" ${c.id ? `id="${c.id}"` : ''} ${c.act ? '' : 'tabindex="-1"'}>
+      <span class="task-icon">${c.icon}</span><span><b>${esc(c.title)}</b><small>${esc(c.sub)}</small>${c.pct !== undefined ? `<i class="task-bar"><i style="width:${Math.min(100, c.pct)}%"></i></i>` : ''}</span></button>`).join('');
+    box.querySelectorAll('[data-task]').forEach((b) => { const c = cards[+b.dataset.task]; if (c.act) b.onclick = c.act; });
   }
 
   function renderHUD() {
     const box = $('#coach');
     if (!box) return;
-    document.querySelectorAll('.pin.coach-target').forEach((p) => p.classList.remove('coach-target'));
+    renderTasks();
+    document.querySelectorAll('.coach-target').forEach((p) => p.classList.remove('coach-target'));
     const st = tutStep();
-    if (st >= 0) {
-      const tgt = tutTarget();
-      if (tgt) { const pin = document.querySelector(`.pin[data-loc="${tgt}"]`); if (pin) pin.classList.add('coach-target'); }
+    if (st < 0) { box.innerHTML = ''; return; }
+    if (S.tut.welcome) {
       box.innerHTML = `
-        <div class="coach-card" role="status">
-          <div class="coach-top"><b>Guided start</b><span class="coach-dots">${[0, 1, 2, 3].map((i) => `<i class="${i < st ? 'done' : i === st ? 'on' : ''}"></i>`).join('')}</span><span class="coach-count">${st + 1} of 4</span>
-          <button class="coach-skip" id="coachSkip">Skip</button></div>
-          <p>${tutText()}</p>
+        <div class="coach-card welcome" role="dialog" aria-label="Welcome">
+          <div class="welcome-row"><span class="welcome-wave">👋🏾</span><div><b>Welcome to London!</b><p>Quick tour, under one minute. Let's go!</p></div></div>
+          <span class="coach-dots">${[0, 1, 2, 3].map(() => '<i></i>').join('')}</span>
+          <div class="welcome-btns"><button class="link-btn" id="coachSkip">Skip</button><button class="btn green" id="coachStart">Start</button></div>
         </div>`;
       $('#coachSkip').onclick = () => finishTut(false);
+      $('#coachStart').onclick = () => { S.tut.welcome = false; save(); render(); };
       return;
     }
-    const steps = goalSteps();
-    const i = steps.findIndex(([, done]) => !done);
-    box.innerHTML = i < 0
-      ? '<button class="goal-pill done" id="goalPill">🏆 <b>Goal reached!</b> Hold on to it until day 60</button>'
-      : `<button class="goal-pill" id="goalPill" aria-label="Next goal: ${esc(steps[i][0])}. Step ${i + 1} of ${steps.length}. Tap for a hint.">🎯 <b>Next:</b> <span>${esc(steps[i][0])}</span> <small>(step ${i + 1} of ${steps.length})</small></button>`;
-    $('#goalPill').onclick = openHints;
+    // Point at what to tap.
+    const targets = {
+      0: ui.view === 'room' ? '.hot[data-hot="kitchen"]' : null,
+      1: '#goOutside, .nav-btn[data-nav="map"]',
+      2: `.pin[data-loc="${JOBS[tutJob()].place}"]`,
+      3: null,
+    };
+    if (targets[st]) document.querySelectorAll(targets[st]).forEach((el) => el.classList.add('coach-target'));
+    box.innerHTML = `
+      <div class="coach-card" role="status">
+        <div class="coach-top"><b>Quick tour</b><span class="coach-dots">${[0, 1, 2, 3].map((i) => `<i class="${i < st ? 'done' : i === st ? 'on' : ''}"></i>`).join('')}</span><span class="coach-count">${st + 1} of 4</span>
+        <button class="coach-skip" id="coachSkip">Skip</button></div>
+        <p>${tutText()}</p>
+      </div>`;
+    $('#coachSkip').onclick = () => finishTut(false);
   }
 
   // ------------------------------------------------------------ daily login reward
@@ -420,7 +464,7 @@ const Coach = (() => {
   function onKey(e) {
     if (!S || $('#game').classList.contains('hidden') || e.ctrlKey || e.metaKey || e.altKey) return;
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    if (!$('#modal').classList.contains('hidden') || !$('#home').classList.contains('hidden')) return;
+    if (!$('#modal').classList.contains('hidden')) return;
     const k = e.key.toLowerCase();
     const pan = { arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1] }[k];
     if (pan && !(k.startsWith('arrow') && document.activeElement.closest && document.activeElement.closest('.sheet'))) { e.preventDefault(); World.nudge(...pan); return; }
@@ -447,6 +491,7 @@ const Coach = (() => {
     },
     start() { if (tutStep() < 0) setTimeout(checkDaily, 800); },
     event, renderHUD, openHints, advice, moneyTip, goalSteps, hintPrice, checkDaily,
+    ownedOutfits: () => dailyState().outfits,
     wardrobeHTML, bindWardrobe, settingsHTML, bindSettings, showPlaces,
   };
 })();

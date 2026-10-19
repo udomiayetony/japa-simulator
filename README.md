@@ -19,6 +19,8 @@ Choose where you're from (about 50 countries, shown by flag), then one of three 
 - **Stations and bridges**: an Underground entrance at every place (our own design, not the TfL roundel), the nine mainline termini (Paddington, Euston, St Pancras, Liverpool Street, Waterloo, Victoria, London Bridge, Marylebone, Charing Cross) and eleven Thames bridges from Hammersmith to London Bridge.
 - **A real London calendar**: the game follows today's date, with Notting Hill Carnival, Bonfire Night fireworks, the Christmas lights on Oxford Street, Winter Wonderland and New Year's Eve over the Thames. Snow days, heatwaves and Thames fog change what you can do.
 - **A home to decorate**: furnish and paint your room in 3D. Comfort makes sleep and home time better.
+- **Set up your life like Lagos Life**: sign up, then five steps: a full-body character (body, outfit style and fabrics like Ankara and Kente), 2 personality traits, a dream, the birth lottery (Fresh Immigrant, Old Money or New Gen, drawn once per account) and where to live.
+- **Start inside your home**: tap the bed, kitchen, shower and furniture, then go outside to the city. Tabs for Home, Map, Shop and Phone, and soft background music.
 - **Help when you need it**: a 60-second guided start, a goal tracker that always shows your next step, 💡 hints (free for your first 2 days, then a small fee) and a daily login streak with rare outfits.
 - **Accessible**: bigger text, colour-blind-safe colours and full keyboard play.
 - **60 landmarks**: Big Ben and Parliament, Westminster Abbey, the London Eye, Buckingham Palace, Nelson's Column, Piccadilly Circus, BT Tower, the British Museum, St Paul's, the Millennium Bridge, Tate Modern, the Shard, Tower Bridge, the Tower of London, the Gherkin, the Walkie-Talkie, the Cheesegrater, Canary Wharf, the O2, the Cutty Sark, the Royal Observatory, the Thames Barrier, Battersea Power Station, the Royal Albert Hall, the Natural History Museum, Harrods, Kensington Palace, Wembley, the Emirates, the London Stadium and the Orbit, Alexandra Palace, Crystal Palace and Heathrow.
@@ -80,7 +82,9 @@ js/data.js     world data: places (real coordinates), Tube lines, jobs, headline
 js/avatar.js   Memoji-style 3D characters and portraits
 js/game.js     engine: time, calendar, weather, needs, travel, careers, events, endings, HUD
 js/coach.js    hints, guided start, goal tracker, daily rewards, wardrobe, accessibility, keyboard
-js/home.js     your home: the 3D room you furnish and paint
+js/onboard.js  the five-step setup: look, personality, dream, birth lottery, home
+js/home.js     your home: the 3D room you start in, tappable furniture and the shop
+js/music.js    background music made live with Web Audio
 js/world.js    the 3D city (Three.js): Thames, bridges, parks, landmarks, railways, stations, people, traffic, festivals, camera
 docs/PRD.md    product requirements
 supabase/      database migrations for Live London

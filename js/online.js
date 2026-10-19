@@ -138,6 +138,16 @@ const Online = (() => {
     return { error };
   }
 
+  // The birth lottery: the server draws it once per account (see the birth_lottery migration).
+  async function drawBirth() {
+    if (!sb || !profile) return null;
+    if (profile.birth) return profile.birth;
+    const { data, error } = await sb.rpc('draw_birth');
+    if (error) { console.warn('Birth lottery unavailable:', error.message); return null; }
+    profile = { ...profile, birth: data, life: data };
+    return data;
+  }
+
   async function becomeCreator() {
     const { error } = await sb.rpc('become_creator');
     if (!error) profile.account_type = profile.account_type === 'player' ? 'creator' : profile.account_type;
@@ -444,7 +454,7 @@ const Online = (() => {
     user: () => user,
     profile: () => profile,
     on: (f) => listeners.add(f),
-    signUp, signIn, signOut, resetPassword, createProfile, updateProfile, becomeCreator,
+    signUp, signIn, signOut, resetPassword, createProfile, updateProfile, becomeCreator, drawBirth,
     pullSave, pushSave, pushSaveNow,
     joinCity, moveTo, leaveCity,
     openChat, sendMessage, profileOf: (id) => profileCache.get(id),

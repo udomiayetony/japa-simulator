@@ -304,3 +304,49 @@ const DAILY_REWARDS = [
   { icon: '💷', label: '£80', money: 80 },
   { icon: '👕', label: 'Free outfit', outfit: true },
 ];
+
+// ---------------------------------------------------------------- setting up a new life
+
+// Outfit styles and fabrics for the full-body character.
+const BODIES = ['woman', 'man'];
+const STYLES = ['casual', 'hoodie', 'office', 'gym', 'hivis'];
+const FABRICS = ['plain', 'ankara', 'kente', 'tartan', 'pinstripe'];
+
+// Pick 2. Each one changes how the game plays (see game.js).
+const TRAITS = {
+  hustler: { icon: '💼', name: 'Hustler', desc: 'Sees money everywhere. Hustle grows faster and bosses notice, so promotions come sooner.' },
+  foodie:  { icon: '🍲', name: 'Foodie', desc: 'Lives for a good plate. Food fills you up more and puts you in a better mood.' },
+  party:   { icon: '🎉', name: 'Party Animal', desc: 'First on the dance floor. Fun hits harder, but it also runs out quicker.' },
+  gym:     { icon: '💪', name: 'Gym Rat', desc: 'Leg day every day. Energy lasts longer, but you need more showers.' },
+  smooth:  { icon: '😏', name: 'Smooth Talker', desc: 'Chats to anyone. Charm grows faster and time with people means more.' },
+  lazy:    { icon: '😴', name: 'Lazy Bones', desc: 'Why stand when you can sit? Energy lasts much longer, but work pays a bit less.' },
+  clean:   { icon: '🧼', name: 'Clean Freak', desc: 'Always fresh. Hygiene drops much slower than everyone else\'s.' },
+  owl:     { icon: '🌙', name: 'Night Owl', desc: 'London never sleeps and neither do you. Late nights cost less energy and are more fun.' },
+};
+
+// A long-term dream on top of your life's goal.
+const DREAMS = {
+  ladder:   { icon: '👔', name: 'Top of the Ladder', desc: 'Reach the top level of any career.' },
+  property: { icon: '🏡', name: 'On the Property Ladder', desc: 'Build a net worth of £15,000.' },
+  mate:     { icon: '🤝', name: "Everyone's Mate", desc: 'Become close friends (60+) with 4 people.' },
+  founder:  { icon: '🦄', name: 'Shoreditch Unicorn', desc: 'Pitch your startup in Shoreditch and get it funded.' },
+  explorer: { icon: '🗺️', name: 'Proper Londoner', desc: 'Visit all 24 places on the map.' },
+};
+
+// Where you live. deposit comes out of your starting money; lives limits who can pick it.
+const HOMES = {
+  share:   { name: 'House share', area: 'woolwich', tag: 'Hard start', rent: 140, deposit: 0, lives: ['immigrant', 'newgen', 'oldmoney'], desc: 'One room in a five-bed house share. Cheap, loud, and the bathroom rota is war.' },
+  halls:   { name: 'Student halls', area: 'kingscross', tag: 'Student life', rent: 125, deposit: 0, lives: ['immigrant', 'newgen'], desc: 'A box room in halls by the British Library. Shared kitchen, free Wi-Fi, fire drills at 3am.' },
+  council: { name: 'Family council flat', area: 'peckham', tag: 'Home', rent: 160, deposit: 0, lives: ['newgen'], desc: 'Your mum\'s flat on the estate. You pay your share, your little brother pays nothing.' },
+  studio:  { name: 'Studio flat', area: 'brixton', tag: 'Balanced', rent: 195, deposit: 350, lives: ['immigrant', 'newgen', 'oldmoney'], desc: 'Your own front door, a kitchen corner and a shower that actually works.' },
+  onebed:  { name: 'One-bed flat', area: 'stratford', tag: 'Big spender', rent: 280, deposit: 700, lives: ['immigrant', 'newgen', 'oldmoney'], desc: 'A proper bedroom, a sitting room and a view of the Olympic Park. Big rent.' },
+  chelsea: { name: 'Mansion flat', area: 'chelsea', tag: 'Pater pays', rent: 350, deposit: 0, lives: ['oldmoney'], desc: 'Two bedrooms off the King\'s Road. Pater pays the rent until he loses patience.' },
+};
+const DEFAULT_HOME = { immigrant: 'share', newgen: 'council', oldmoney: 'chelsea' };
+
+// What the birth lottery tells you about each start.
+const BIRTH_PERKS = {
+  immigrant: { icon: '✈️', title: 'Fresh Immigrant!', line: 'Just landed in London with an immigrant visa.', perks: ['£1,200 in the bank to start', 'Starter visa: work 20 hours a week', 'Switch to a Skilled Worker visa by day 35', 'Hustle starts at 30'] },
+  oldmoney:  { icon: '🎩', title: 'Old Money!', line: 'Family trust, knows everyone.', perks: ['£3,000 to start and £400 a week from Pater', 'Pater pays your rent, for now', 'Charm starts at 45', 'Prove yourself: £12,000 net worth by day 60'] },
+  newgen:    { icon: '🧢', title: 'New Gen!', line: 'Born in London, living on loans.', perks: ['£300 to start and a £2,000 QuickCash loan', 'QuickCash takes £80 every Monday, at 2% a week', 'Hustle starts at 40: you know every bus route', 'Clear the debt and save £2,500'] },
+};

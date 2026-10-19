@@ -63,11 +63,14 @@ function advance(mins, opts = {}) {
     left -= step;
     const h = step / 60;
     const n = S.needs;
+    const hr = hour();
+    const late = hr >= 21 || hr < 4;
+    const energyRate = (has('gym') ? 0.85 : 1) * (has('lazy') ? 0.75 : 1) * (has('owl') && late ? 0.7 : 1);
     n.hunger = clamp(n.hunger - (opts.sleep ? 1.2 : 3.5) * h);
-    n.energy = clamp(n.energy - (opts.sleep ? 0 : 3) * h);
-    n.fun = clamp(n.fun - (opts.sleep ? 0.5 : 1.5) * h);
+    n.energy = clamp(n.energy - (opts.sleep ? 0 : 3) * h * energyRate);
+    n.fun = clamp(n.fun - (opts.sleep ? 0.5 : 1.5) * h * (has('party') ? 1.2 : 1));
     n.social = clamp(n.social - (opts.sleep ? 0.5 : 1.2) * h);
-    n.hygiene = clamp(n.hygiene - (opts.sleep ? 1 : 2) * h);
+    n.hygiene = clamp(n.hygiene - (opts.sleep ? 1 : 2) * h * (has('clean') ? 0.7 : 1) * (has('gym') ? 1.15 : 1));
     if (day() !== before) newDay();
   }
 }
@@ -149,10 +152,26 @@ function monthly() {
 const NEED_LABELS = { hunger: 'Hunger', energy: 'Energy', fun: 'Fun', social: 'Social', hygiene: 'Hygiene' };
 const SKILL_LABELS = { hustle: 'Hustle', charm: 'Charm', code: 'Coding' };
 
+// Personality traits picked when setting up a life.
+const has = (trait) => !!(S && S.traits && S.traits.includes(trait));
+function traitBoost(k, v) {
+  if (v <= 0) return v;
+  const late = hour() >= 20 || hour() < 4;
+  let m = 1;
+  if (k === 'hustle' && has('hustler')) m *= 1.5;
+  if (k === 'charm' && has('smooth')) m *= 1.5;
+  if (k === 'social' && has('smooth')) m *= 1.25;
+  if (k === 'hunger' && has('foodie')) m *= 1.25;
+  if (k === 'fun' && has('party')) m *= 1.25;
+  if (k === 'fun' && has('owl') && late) m *= 1.3;
+  return k in S.skills ? Math.round(v * m) : v * m;
+}
+
 function fx(e = {}) {
   const chips = [];
+  if (has('foodie') && e.hunger > 0) e = { ...e, fun: (e.fun || 0) + 4 };
   for (const k in e) {
-    const v = e[k];
+    const v = k === 'money' || k === 'family' ? e[k] : traitBoost(k, e[k]);
     if (!v) continue;
     if (k in S.needs) { S.needs[k] = clamp(S.needs[k] + v); chips.push(`${v > 0 ? '+' : ''}${Math.round(v)} ${NEED_LABELS[k]}`); }
     else if (k in S.skills) { S.skills[k] = clamp(S.skills[k] + v); chips.push(`${v > 0 ? '+' : ''}${v} ${SKILL_LABELS[k]}`); }
@@ -315,10 +334,15 @@ function travel(to, mode) {
   advance(mins);
   fx({ energy: -tiring });
   S.loc = to;
+  S.visited = [...new Set([...(S.visited || []), to])];
   ui.target = null;
   ui.tab = 'here';
   const path = mode === 'cab' ? [from, to] : route(from, to);
-  World.travelAnim(to, mode, path, routeColours(path));
+  if (ui.view === 'room') setView('city');
+  World.travelAnim(to, mode, path, routeColours(path)).then(() => {
+    // Arriving home takes you inside.
+    if (S && S.loc === to && to === S.home && ui.view === 'city' && !ui.target && !$('#game').classList.contains('hidden')) { setView('room'); render(); }
+  });
   Online.moveTo(to);
   Coach.event('travel', { to, mode });
   log(`${o.label.split(' ')[0]} ${LOCATIONS[from].name} → ${LOCATIONS[to].name} (${mins} min${o.cost ? ', ' + money(o.cost) : ''}).${extra}`);
@@ -371,7 +395,7 @@ function maybePromote() {
   const next = levels[(S.jobLevel || 0) + 1];
   if (!next) return '';
   const [title, pay, shifts, req = {}] = next;
-  const ready = S.jobShifts >= shifts && Object.keys(req).every((k) => S.skills[k] >= req[k]) && mood() > 40;
+  const ready = S.jobShifts >= shifts - (has('hustler') ? 2 : 0) && Object.keys(req).every((k) => S.skills[k] >= req[k]) && mood() > 40;
   if (!ready) return '';
   S.jobLevel = (S.jobLevel || 0) + 1;
   S.stats.promotions = (S.stats.promotions || 0) + 1;
@@ -381,7 +405,7 @@ function maybePromote() {
 function workShift(hrs) {
   const j = JOBS[S.job];
   const factor = 0.75 + mood() / 400;
-  let pay = round2(hrs * jobLevel()[1] * factor * (Online.policy() === 'wage_rise' ? 1.1 : 1));
+  let pay = round2(hrs * jobLevel()[1] * factor * (Online.policy() === 'wage_rise' ? 1.1 : 1) * (has('lazy') ? 0.92 : 1));
   if (hrs >= 12) pay = round2(pay * 1.2);
   if (S.job === 'rider' && ['rain', 'snow'].includes(S.weather)) pay = round2(pay * 1.3); // orders surge in bad weather
   S.weekHours += hrs;
@@ -566,6 +590,14 @@ function placeActions(loc) {
       act('🍕 Tech meetup (free pizza)', { mins: 150, disabled: h >= 18 && h < 22 ? null : 'Meetups are 6pm to 10pm', run: () => { S.rel.priya = clamp(S.rel.priya + 5); return '🍕 Ate free pizza and nodded through a talk about AI.' + fx({ hunger: 30, code: 3, charm: 2, social: 12 }); } }),
       act('🥯 Salt beef bagel, Brick Lane', { mins: 20, cost: 3.5, run: () => '🥯 Brick Lane bagel. Open 24/7, mustard on point.' + fx({ hunger: 32, fun: 5 }) }),
       act('🎨 Street art tour', { mins: 60, run: () => '🎨 Spotted a Banksy (probably).' + fx({ fun: 10 }) }),
+      ...(S.flags.funded ? [] : [act('🚀 Pitch your startup to investors', {
+        mins: 180, sub: 'Needs Coding 60, Charm 40',
+        disabled: S.skills.code < 60 || S.skills.charm < 40 ? 'Needs Coding 60 and Charm 40' : openBetween(9, 18) ? null : 'Investors meet 9am to 6pm',
+        run: () => {
+          if (chance(0.25 + (S.skills.code - 60) / 100 + S.skills.charm / 400)) { S.flags.funded = true; return '🚀 FUNDED! A Shoreditch VC backed your app. They paid you a £3,000 founder salary advance. 🎉' + fx({ money: 3000, fun: 30 }); }
+          return '🚀 "Love the energy, not for us right now." Keep building and pitch again.' + fx({ fun: -8, charm: 1 });
+        },
+      })]),
     ],
     stratford: [
       act('🏟️ Walk the Olympic Park', { mins: 60, run: () => '🏟️ Walked round the London Stadium. Felt very sporty.' + fx({ fun: 10, energy: -4 }) }),
@@ -716,6 +748,11 @@ function crisis() {
 function afterAction() {
   if (!S.over) crisis();
   if (!S.over) checkEnd();
+  if (!S.over && S.dream && !S.flags.dreamDone && dreamMet()) {
+    S.flags.dreamDone = true;
+    toast(`${DREAMS[S.dream].icon} Dream achieved: ${DREAMS[S.dream].name}!`);
+    log(`${DREAMS[S.dream].icon} DREAM ACHIEVED: ${DREAMS[S.dream].name}. Nobody can take that from you.`, 'good');
+  }
   if (!S.over && goalMet() && !S.flags.goalToast) {
     S.flags.goalToast = true;
     toast('🏆 Goal reached! Keep it up until day 60.');
@@ -737,8 +774,8 @@ const EVENTS = {
   visaWarn: { title: '🛂 Home Office letter', text: 'Your starter visa expires on day 35. If you\'re not on a Skilled Worker visa by then, you\'re going home. Get a job that sponsors visas, then apply at Lunar House in Croydon.', choices: [{ label: 'No pressure then 😬', run: () => fx({ fun: -5 }) }] },
   paterCall: { title: '📞 Pater calls', text: '"I\'ve spoken to your mother. We\'re worried you have no ambition. Show us you can stand on your own two feet."', choices: [{ label: '"Yes, Pater."', run: () => '' }, { label: '"I\'m literally an influencer."', run: () => fx({ fun: 5, family: -10 }) }] },
   cutOff: {
-    title: '💀 Cut off', text: 'Pater has had enough. "No more allowance. I\'ll pay half the Chelsea rent and not a penny more. It\'s time you worked."',
-    choices: [{ label: 'Gulp.', run: () => { S.allowance = 0; S.rent = 350; S.flags.cutOff = true; return fx({ fun: -15 }); } }],
+    title: '💀 Cut off', text: 'Pater has had enough. "No more allowance, and you can pay your own rent. It\'s time you worked."',
+    choices: [{ label: 'Gulp.', run: () => { S.allowance = 0; S.rent = S.homeKey === 'chelsea' || !S.homeRent ? 350 : S.homeRent; S.flags.cutOff = true; return fx({ fun: -15 }); } }],
   },
   debtIntro: { title: '💳 QuickCash Loans', text: 'Friendly reminder! Your £2,000 loan costs 2% interest a week. We\'ll take £80 every Monday. Have a lovely day ❤️', choices: [{ label: 'Wonderful.', run: () => fx({ fun: -5 }) }] },
 };
@@ -850,6 +887,19 @@ function processQueue() {
 
 // ---------------------------------------------------------------- endings
 
+// The long-term dream picked when setting up a life.
+function dreamProgress() {
+  switch (S.dream) {
+    case 'ladder': { const best = S.job ? (S.jobLevel || 0) + 1 : 0; return [best, 3, `Career level ${best} of 3`]; }
+    case 'property': return [Math.max(0, netWorth()), 15000, `Net worth ${money(Math.max(0, netWorth()))} / £15,000`];
+    case 'mate': { const n = Object.values(S.rel).filter((r) => r >= 60).length; return [n, 4, `${n} of 4 close friends`]; }
+    case 'founder': return [S.flags.funded ? 1 : 0, 1, S.flags.funded ? 'Funded!' : 'Pitch in Shoreditch (Coding 60, Charm 40)'];
+    case 'explorer': { const n = new Set(S.visited || []).size; return [n, 24, `${n} of 24 places visited`]; }
+    default: return null;
+  }
+}
+const dreamMet = () => { const p = dreamProgress(); return !!p && p[0] >= p[1]; };
+
 function goalMet() {
   if (S.bg === 'immigrant') return S.visa.type === 'skilled' && S.money >= 3000;
   if (S.bg === 'oldmoney') return netWorth() >= 12000;
@@ -902,6 +952,7 @@ function score() {
   const rel = Object.values(S.rel).reduce((a, b) => a + b, 0);
   let s = netWorth() / 4 + mood() * 8 + rel * 2 + (S.over && S.over.win ? 1500 : 0) + S.over.day * 10;
   if (S.flags.lifeUk) s += 200;
+  if (S.flags.dreamDone) s += 700;
   return Math.max(0, Math.round(s));
 }
 function grade(s) {
@@ -923,6 +974,7 @@ function showEnd() {
       <p class="eyebrow">Day ${S.over.day} · ${flagOf(S.country)} ${esc(BACKGROUNDS[S.bg].name)}</p>
       <h2>${esc(head)}</h2>
       <p>${esc(body)}</p>
+      ${S.dream ? `<p class="end-dream">${DREAMS[S.dream].icon} Dream: <b>${DREAMS[S.dream].name}</b> ${S.flags.dreamDone ? '✅ achieved' : '· not this time'}</p>` : ''}
       <div class="grade">Grade <b>${g}</b><span>${sc.toLocaleString()} pts</span></div>
       <ul class="end-stats">
         <li><b>${money(netWorth())}</b>net worth</li>
@@ -959,7 +1011,31 @@ function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /*
 
 // ---------------------------------------------------------------- HUD over the 3D city
 
-const ui = { tab: 'here', target: null, expanded: false };
+// view: 'room' (inside your home) or 'city' (the map). tab: what the bottom panel shows.
+const ui = { tab: 'here', target: null, expanded: false, view: 'city' };
+const PHONE_APPS = [
+  ['me', '🧍', 'Me'], ['story', '📖', 'Story'], ['hints', '💡', 'Hints'], ['places', '🗺️', 'Places'],
+  ['chat', '💬', 'Chat', true], ['people', '👥', 'People', true], ['city', '🏛️', 'City Hall', true], ['menu', '⚙️', 'Settings'],
+];
+const PHONE_TABS = ['phone', 'me', 'story', 'chat', 'people', 'city'];
+
+function setView(v) {
+  if (v === 'room' && S.loc !== S.home) v = 'city';
+  const changed = ui.view !== v;
+  ui.view = v;
+  const room = v === 'room' && !$('#game').classList.contains('hidden');
+  Home.setActive(room);
+  World.setPaused(room);
+  document.body.classList.toggle('in-room', room);
+  if (changed && v === 'city') { World.focus(S.loc, 62); Coach.event('view', 'city'); }
+}
+function goOutside() { setView('city'); ui.tab = 'here'; render(); }
+function goHome() {
+  if (S.loc === S.home) { ui.target = null; ui.tab = 'here'; setView('room'); render(); return; }
+  setView('city');
+  selectPlace(S.home);
+  toast('🏠 Head home first: pick how to get there.');
+}
 const NEED_ICONS = { hunger: '🍔', energy: '⚡', fun: '🎉', social: '💬', hygiene: '🚿' };
 
 function bar(label, v, cls = '') {
@@ -975,6 +1051,7 @@ function render() {
   $('#clockPill').innerHTML = `<i class="dot"></i><span>Day ${Math.min(day(), GAME_DAYS)}<span class="wide">/${GAME_DAYS}</span> · <span class="wide">${DAYS[dow()]} </span>${gd.getDate()} ${MONTHS[gd.getMonth()]} ${clock()}${live}</span>`;
   $('#topActions').innerHTML = `
     <span class="pill money ${S.money < 0 ? 'neg' : ''}">💷 ${money(S.money)}</span>
+    <button class="pill icon music-btn" id="musicBtn" aria-label="${Music.isOn() ? 'Turn music off' : 'Turn music on'}" title="Music">${Music.isOn() ? '🔊' : '🔇'}</button>
     <button class="pill icon hint-btn" id="hintBtn" aria-label="Get a hint" title="Get a hint (H)">💡</button>
     <button class="pill icon" id="helpBtn" aria-label="How to play">?</button>
     <button class="pill icon" id="menuBtn" aria-label="Menu">☰</button>`;
@@ -1005,7 +1082,6 @@ function render() {
       return `<span class="ring ${lvl}" style="--v:${v}" role="img" aria-label="${NEED_LABELS[k]} ${v} out of 100" title="${NEED_LABELS[k]} ${v}"><i>${NEED_ICONS[k]}</i></span>`;
     }).join('')}</div>`;
 
-  Coach.renderHUD();
   renderSheet();
   World.markPins(S.loc, S.home, ui.target);
   World.setTime(hour() + (S.t % 60) / 60, S.weather);
@@ -1013,33 +1089,75 @@ function render() {
 
   $('#helpBtn').onclick = showHelp;
   $('#hintBtn').onclick = Coach.openHints;
+  $('#musicBtn').onclick = () => { Music.toggle(); render(); };
+  Home.renderBar();
+  const navActive = PHONE_TABS.includes(ui.tab) ? 'phone' : ui.tab === 'shop' ? 'shop' : ui.view === 'room' ? 'home' : 'map';
+  const badge = Online.signedIn() ? Online.state.unread + Online.state.incoming.length : 0;
+  $('#nav').innerHTML = [['home', '🏠', 'Home'], ['map', '🗺️', 'Map'], ['shop', '🛍️', 'Shop'], ['phone', '📱', 'Phone', badge]]
+    .map(([id, icon, label, b]) => `<button class="nav-btn ${navActive === id ? 'on' : ''}" data-nav="${id}" aria-current="${navActive === id}"><span>${icon}</span><small>${label}</small>${b ? `<b class="badge">${b}</b>` : ''}</button>`).join('');
+  document.querySelectorAll('[data-nav]').forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.nav;
+      ui.target = null;
+      if (id === 'home') return goHome();
+      if (id === 'map') { ui.tab = 'here'; setView('city'); }
+      else { ui.tab = id; ui.expanded = true; }
+      render();
+    };
+  });
   $('#menuBtn').onclick = showMenu;
-  $('#meChip').onclick = () => { ui.target = null; ui.tab = 'me'; ui.expanded = true; renderSheet(); };
-  $('#ticker').onclick = () => { ui.target = null; ui.tab = 'story'; ui.expanded = true; renderSheet(); };
+  Coach.renderHUD();
+  $('#meChip').onclick = () => { ui.target = null; ui.tab = 'me'; ui.expanded = true; render(); };
+  $('#ticker').onclick = () => { ui.target = null; ui.tab = 'story'; ui.expanded = true; render(); };
+}
+
+function phoneHTML() {
+  const live = Online.signedIn();
+  return `<div class="phone-apps">${PHONE_APPS.filter(([, , , online]) => !online || live).map(([id, icon, label]) => {
+    const b = id === 'people' ? Online.state.unread + Online.state.incoming.length : 0;
+    return `<button class="app" data-app="${id}"><span>${icon}</span><small>${label}</small>${b ? `<b class="badge">${b}</b>` : ''}</button>`;
+  }).join('')}</div>${live ? '' : '<p class="hint">Chat, People and City Hall appear when you are signed in.</p>'}`;
 }
 
 function renderSheet() {
   const sheet = $('#sheet');
   sheet.classList.toggle('expanded', ui.expanded);
+  // Inside your home you use the room itself, so the action list stays out of the way.
+  sheet.classList.toggle('hidden', ui.view === 'room' && ui.tab === 'here' && !ui.target);
   if (ui.target && ui.target !== S.loc) return renderTravel(sheet);
-  const tabs = [['here', '📍', S.loc === S.home ? 'Home' : 'Here'], ['me', '🧍', 'Me'], ['story', '📖', 'Story']];
-  if (Online.signedIn()) tabs.push(['chat', '💬', 'Chat'], ['people', '👥', 'People', Online.state.unread + Online.state.incoming.length], ['city', '🏛️', 'City']);
-  else if (['chat', 'people', 'city'].includes(ui.tab)) ui.tab = 'here';
+  if (!Online.signedIn() && LiveUI.TABS.includes(ui.tab)) ui.tab = 'phone';
   let body = '';
+  const titles = { me: 'Me', story: 'Story', chat: 'Chat', people: 'People', city: 'City Hall' };
   if (ui.tab === 'here') body = hereHTML();
+  else if (ui.tab === 'shop') body = Home.shopHTML();
+  else if (ui.tab === 'phone') body = phoneHTML();
   else if (ui.tab === 'me') body = meHTML();
   else if (LiveUI.TABS.includes(ui.tab)) body = LiveUI.tabHTML(ui.tab);
   else body = `<ol class="log">${S.log.slice(0, 40).map((l) => `<li class="${l.kind}"><time>${l.t}</time><span>${esc(l.text)}</span></li>`).join('')}</ol>`;
+  const back = titles[ui.tab] ? `<div class="app-head"><button class="link-btn" id="phoneBack">‹ Phone</button><b>${titles[ui.tab]}</b></div>` : '';
   sheet.innerHTML = `
     <button class="handle" id="sheetHandle" aria-label="${ui.expanded ? 'Collapse' : 'Expand'} panel"><i></i></button>
-    <nav class="tabs">${tabs.map(([id, icon, label, badge]) => `<button class="tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}" aria-label="${label}">${icon}<span class="tab-text"> ${label}</span>${badge ? `<b class="badge">${badge}</b>` : ''}</button>`).join('')}</nav>
+    ${back}
     <div class="sheet-body">${body}</div>`;
   $('#sheetHandle').onclick = () => { ui.expanded = !ui.expanded; renderSheet(); };
-  sheet.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { ui.tab = b.dataset.tab; ui.expanded = ui.tab !== 'here' || ui.expanded; renderSheet(); }; });
+  if ($('#phoneBack')) $('#phoneBack').onclick = () => { ui.tab = 'phone'; render(); };
   if (ui.tab === 'here') {
     const acts = placeActions(S.loc);
     sheet.querySelectorAll('[data-act]').forEach((b) => { b.onclick = () => runAction(acts[+b.dataset.act]); });
-    if ($('#decorateBtn')) $('#decorateBtn').onclick = () => Home.open();
+    if ($('#decorateBtn')) $('#decorateBtn').onclick = () => { ui.tab = 'shop'; ui.expanded = true; render(); };
+  }
+  if (ui.tab === 'shop') Home.bindShop(sheet);
+  if (ui.tab === 'phone') {
+    sheet.querySelectorAll('[data-app]').forEach((b) => {
+      b.onclick = () => {
+        const id = b.dataset.app;
+        if (id === 'hints') return Coach.openHints();
+        if (id === 'places') return Coach.showPlaces();
+        if (id === 'menu') return showMenu();
+        ui.tab = id;
+        render();
+      };
+    });
   }
   if (ui.tab === 'me') Coach.bindWardrobe(sheet);
   if (LiveUI.TABS.includes(ui.tab)) LiveUI.bindTab(ui.tab, sheet);
@@ -1080,6 +1198,8 @@ function meHTML() {
         <h4>Goal · ${esc(BACKGROUNDS[S.bg].name)}</h4>
         <p class="goal">${esc(BACKGROUNDS[S.bg].goal)}</p>
         ${goalProgress().map((g) => bar(g.label, g.pct, 'goalbar')).join('')}
+        ${S.dream ? (() => { const [v, max, label] = dreamProgress(); return `<h4>Dream · ${DREAMS[S.dream].icon} ${DREAMS[S.dream].name}</h4>${bar(S.flags.dreamDone ? 'Achieved ✅' : label, (100 * v) / max, 'goalbar')}`; })() : ''}
+        ${S.traits && S.traits.length ? `<h4>Personality</h4><div class="bag">${S.traits.map((t) => `<span title="${esc(TRAITS[t].desc)}">${TRAITS[t].icon} ${TRAITS[t].name}</span>`).join('')}</div>` : ''}
         <h4>Bag</h4>
         <div class="bag">
           <span>🥫 ${S.groceries} meals</span>
@@ -1126,6 +1246,8 @@ function renderTravel(sheet) {
 
 function selectPlace(id) {
   if (!S || S.over || $('#game').classList.contains('hidden')) return;
+  if (ui.view === 'room') setView('city');
+  if (PHONE_TABS.includes(ui.tab) || ui.tab === 'shop') ui.tab = 'here';
   ui.target = id === S.loc ? null : id;
   if (!ui.target) ui.tab = 'here';
   World.focus(id);
@@ -1165,6 +1287,8 @@ function showMenu() {
       ${['high', 'medium', 'low'].map((q) => `<button class="${World.getQuality() === q ? 'on' : ''}" data-quality="${q}">${{ high: 'High', medium: 'Medium', low: 'Low' }[q]}</button>`).join('')}
     </div>
     <p class="hint">High adds soft shadows, ambient occlusion and glow. Use Low if your phone gets hot or slow.</p>
+    <h4 class="menu-label">Sound</h4>
+    <button class="toggle" id="musicToggle" role="switch" aria-checked="${Music.isOn()}"><span><b>Background music</b><small>Soft music while you play</small></span><i></i></button>
     ${Coach.settingsHTML()}
     <div class="choices vertical">
       <button class="btn primary" data-close>Resume</button>
@@ -1184,6 +1308,7 @@ function showMenu() {
   $('#howBtn').onclick = showHelp;
   $('#placesBtn').onclick = Coach.showPlaces;
   Coach.bindSettings();
+  $('#musicToggle').onclick = (e) => { Music.toggle(); e.currentTarget.setAttribute('aria-checked', String(Music.isOn())); if (S) render(); };
   $('#titleBtn').onclick = () => { closeModal(); showTitle(); };
   $('#restartBtn').onclick = (e) => {
     if (!e.currentTarget.dataset.armed) {
@@ -1211,135 +1336,85 @@ function closeModal() {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('hidden', s.id !== id));
   World.setAttract(id !== 'game');
-  if (id === 'create') renderCreate();
+  if (id !== 'game') Home.setActive(false);
+  document.body.classList.toggle('in-room', id === 'game' && ui.view === 'room');
+  if (id === 'create') Onboard.open();
 }
 
-function showTitle() {
+// Accounts are required: signed-out players see Sign up and Log in on the title screen.
+// Without Supabase settings (the offline preview) the game plays without an account.
+const needsAccount = () => Online.enabled() && !Online.signedIn();
+let pendingNew = false;
+function titleButtons() {
   const saved = load();
-  $('#continueBtn').classList.toggle('hidden', !(saved && !saved.over));
+  const nb = $('#newBtn'), cb = $('#continueBtn');
+  if (needsAccount()) {
+    nb.textContent = 'Sign up free';
+    cb.textContent = 'Log in';
+    cb.classList.remove('hidden');
+  } else {
+    nb.textContent = 'Start a new life';
+    cb.textContent = 'Continue';
+    cb.classList.toggle('hidden', !(saved && !saved.over) && !Online.signedIn());
+  }
+}
+function showTitle() {
   Online.leaveCity();
   showScreen('title');
+  titleButtons();
   LiveUI.renderTitle();
 }
+// Called when sign-in state changes.
+function onAuthChange() {
+  if (!$('#title').classList.contains('hidden')) titleButtons();
+  if (!pendingNew || !Online.signedIn()) return;
+  // Wait for the sign-up and username screens to close first.
+  if (!$('#modal').classList.contains('hidden')) { setTimeout(onAuthChange, 400); return; }
+  pendingNew = false;
+  startNewLife();
+}
+function startNewLife() {
+  const saved = load();
+  if (!saved || saved.over) return showScreen('create');
+  openModal(`<h2>Start a new life?</h2><p>Your saved game (${esc(saved.name)}, day ${Math.floor(saved.t / 1440) + 1}) will be replaced.</p>
+    <div class="choices"><button class="btn" data-close>Keep my save</button><button class="btn primary" id="confirmNew">Start fresh</button></div>`);
+  $('[data-close]').onclick = closeModal;
+  $('#confirmNew').onclick = () => { clearSave(); closeModal(); showScreen('create'); };
+}
 
-const create = { name: '', bg: 'immigrant', country: null, countrySearch: '', look: { skin: 5, hair: 2, hairColour: 0, outfit: 0, head: 0, hatColour: 0, eyewear: 0, facial: 0, earrings: 0 } };
-const NAMES = ['Tunde', 'Amara', 'Ifeoma', 'Kwame', 'Zainab', 'Femi', 'Chioma', 'Dami', 'Ngozi', 'Seyi'];
-const LOOK_LABELS = {
-  hair: { short: 'Short', fade: 'Fade', afro: 'Afro', puffs: 'Puffs', braids: 'Braids', locs: 'Locs', bob: 'Bob', long: 'Long', curly: 'Curly', bun: 'Bun', mohawk: 'Mohawk', bald: 'Bald' },
-  head: { none: 'None', beanie: 'Beanie', cap: 'Cap', bucket: 'Bucket hat', beret: 'Beret', gele: 'Gele', hijab: 'Hijab', turban: 'Turban' },
-  eyewear: { none: 'None', round: 'Round', square: 'Square', shades: 'Shades' },
-  facial: { none: 'None', stubble: 'Stubble', goatee: 'Goatee', moustache: 'Moustache', beard: 'Beard' },
-  earrings: { none: 'None', studs: 'Studs', hoops: 'Hoops' },
+const create = {
+  name: '', bg: 'immigrant', country: null, countrySearch: '', home: null, traits: [], dream: null, step: 0, birthDrawn: false,
+  look: { body: 'man', skin: 5, hair: 'afro', hairColour: 0, outfit: 0, style: 'casual', fabric: 'plain', head: 'none', hatColour: 0, eyewear: 'none', facial: 'none', earrings: 'none' },
 };
-const LOOK_LISTS = { hair: HAIR, head: HEADWEAR, eyewear: EYEWEAR, facial: FACIAL, earrings: EARRINGS };
-
-function renderCreate() {
-  if (!create.name) create.name = pick(NAMES);
-  // Immigrants pick where they moved from; everyone else defaults to UK-born.
-  if (!create.country || (create.bg === 'immigrant' && create.country === 'GB')) {
-    create.country = create.bg === 'immigrant' ? pick(COUNTRIES.slice(1))[0] : 'GB';
-  }
-  const L = create.look;
-  const sw = (arr, key) => arr.map((c, i) => `<button class="swatch ${L[key] === i ? 'on' : ''}" style="background:${c}" data-look="${key}" data-i="${i}" aria-label="${key} ${i + 1}"></button>`).join('');
-  const chips = (key) => LOOK_LISTS[key].map((v, i) => `<button class="chip-btn ${L[key] === i ? 'on' : ''}" data-look="${key}" data-i="${i}">${LOOK_LABELS[key][v]}</button>`).join('');
-  const scroll = $('.create-card') ? $('.create-card').scrollTop : 0;
-  $('#create-body').innerHTML = `
-    <div class="create-grid">
-      <div class="preview">
-        <img class="avatar-img big" src="${Avatar.portrait(lookFromCreate())}" alt="Your character">
-        <button class="btn white small-btn" id="randomBtn">🎲 Surprise me</button>
-        <label class="field"><span>Name</span><input id="nameInput" maxlength="16" value="${esc(create.name)}"></label>
-      </div>
-      <div class="looks">
-        <h4>Skin</h4><div class="swatches">${sw(SKIN, 'skin')}</div>
-        <h4>Hair</h4><div class="swatches">${chips('hair')}</div>
-        <h4>Hair colour</h4><div class="swatches">${sw(HAIR_COLOURS, 'hairColour')}</div>
-        <h4>Headwear</h4><div class="swatches">${chips('head')}</div>
-        ${L.head ? `<h4>Headwear colour</h4><div class="swatches">${sw(HAT_COLOURS, 'hatColour')}</div>` : ''}
-        <h4>Glasses</h4><div class="swatches">${chips('eyewear')}</div>
-        <h4>Facial hair</h4><div class="swatches">${chips('facial')}</div>
-        <h4>Earrings</h4><div class="swatches">${chips('earrings')}</div>
-        <h4>Outfit</h4><div class="swatches">${sw(OUTFITS, 'outfit')}</div>
-      </div>
-    </div>
-    <h4>Who are you in London?</h4>
-    <div class="bgs">${Object.entries(BACKGROUNDS).map(([id, b]) => `
-      <button class="bg-card ${create.bg === id ? 'on' : ''}" data-bg="${id}">
-        <b>${{ immigrant: '✈️', oldmoney: '🎩', newgen: '🧢' }[id]} ${b.name}</b>
-        <small>${b.tag}</small>
-        <p>${b.blurb}</p>
-        <p class="bg-goal">🏆 ${b.goal}</p>
-        <span class="bg-stats">Start: ${money(b.money)}${b.debt ? ` · Debt ${money(b.debt)}` : ''} · Rent ${b.rent ? money(b.rent) + '/wk' : 'paid by Pater'}</span>
-      </button>`).join('')}</div>
-    <h4>${create.bg === 'immigrant' ? 'Where did you move from?' : 'Where are your family roots?'}</h4>
-    <div class="country-row">
-      <span class="country-picked">${flagOf(create.country)} <b>${esc(countryName(create.country))}</b></span>
-      <input id="countrySearch" class="country-search" placeholder="Search countries" value="${esc(create.countrySearch)}" aria-label="Search countries">
-    </div>
-    <div class="countries">${COUNTRIES.filter(([c, n]) => !(create.bg === 'immigrant' && c === 'GB') && n.toLowerCase().includes(create.countrySearch.toLowerCase())).map(([c, n]) => `
-      <button class="country ${create.country === c ? 'on' : ''}" data-country="${c}" title="${esc(n)}"><span class="flag">${flagOf(c)}</span><span>${esc(n)}</span></button>`).join('') || '<p class="hint">No country matches that search.</p>'}</div>`;
-  if ($('.create-card')) $('.create-card').scrollTop = scroll;
-  document.querySelectorAll('[data-country]').forEach((b) => { b.onclick = () => { create.country = b.dataset.country; renderCreate(); }; });
-  const cs = $('#countrySearch');
-  cs.oninput = (e) => {
-    create.countrySearch = e.target.value;
-    renderCreate();
-    const again = $('#countrySearch');
-    again.focus();
-    again.setSelectionRange(again.value.length, again.value.length);
-  };
-  document.querySelectorAll('[data-look]').forEach((b) => { b.onclick = () => { L[b.dataset.look] = +b.dataset.i; renderCreate(); }; });
-  document.querySelectorAll('[data-bg]').forEach((b) => {
-    b.onclick = () => {
-      const was = create.bg;
-      create.bg = b.dataset.bg;
-      if (was === 'immigrant' && create.bg !== 'immigrant') create.country = 'GB';
-      renderCreate();
-    };
-  });
-  $('#randomBtn').onclick = () => {
-    const r = (n) => Math.floor(Math.random() * n);
-    Object.assign(L, {
-      skin: r(SKIN.length), hair: r(HAIR.length), hairColour: Math.random() < 0.8 ? r(6) : r(HAIR_COLOURS.length), outfit: r(OUTFITS.length),
-      head: Math.random() < 0.5 ? 0 : r(HEADWEAR.length), hatColour: r(HAT_COLOURS.length), eyewear: Math.random() < 0.6 ? 0 : r(EYEWEAR.length),
-      facial: Math.random() < 0.6 ? 0 : r(FACIAL.length), earrings: Math.random() < 0.6 ? 0 : r(EARRINGS.length),
-    });
-    renderCreate();
-  };
-  $('#nameInput').oninput = (e) => { create.name = e.target.value; };
-}
-
-// Creation stores list positions; the saved look uses names for the style options.
-function lookFromCreate() {
-  const L = create.look;
-  return {
-    skin: L.skin, hair: HAIR[L.hair], hairColour: L.hairColour, outfit: L.outfit,
-    head: HEADWEAR[L.head], hatColour: L.hatColour, eyewear: EYEWEAR[L.eyewear], facial: FACIAL[L.facial], earrings: EARRINGS[L.earrings],
-  };
-}
+const NAMES = ['Tunde', 'Amara', 'Ifeoma', 'Kwame', 'Zainab', 'Femi', 'Chioma', 'Dami', 'Ngozi', 'Seyi'];
+function lookFromCreate() { return { ...create.look }; }
 
 function newGame() {
   const B = BACKGROUNDS[create.bg];
+  const homeKey = HOMES[create.home] && HOMES[create.home].lives.includes(create.bg) ? create.home : DEFAULT_HOME[create.bg];
+  const H = HOMES[homeKey];
   const look = lookFromCreate();
   S = {
-    v: 1, name: (create.name || 'Tunde').trim().slice(0, 16) || 'Tunde', bg: create.bg, look, country: create.country || 'GB', start: isoDate(new Date()),
-    t: 8 * 60, loc: create.bg === 'immigrant' ? 'heathrow' : B.home, home: B.home,
-    money: B.money, debt: B.debt, rent: B.rent, allowance: create.bg === 'oldmoney' ? 400 : 0,
-    needs: { hunger: 70, energy: create.bg === 'immigrant' ? 45 : 75, fun: 65, social: 55, hygiene: create.bg === 'immigrant' ? 50 : 80 },
-    skills: { ...B.skills }, job: null, jobLevel: 0, jobShifts: 0, weekHours: 0, groceries: create.bg === 'immigrant' ? 0 : 3, outfit: create.bg === 'oldmoney', family: 60,
+    v: 2, name: (create.name || 'Tunde').trim().slice(0, 16) || 'Tunde', bg: create.bg, look, country: create.country || 'GB', start: isoDate(new Date()),
+    t: 8 * 60, loc: H.area, home: H.area, homeKey, homeRent: H.rent,
+    money: B.money - H.deposit, debt: B.debt, rent: create.bg === 'oldmoney' ? 0 : H.rent, allowance: create.bg === 'oldmoney' ? 400 : 0,
+    needs: { hunger: 45, energy: create.bg === 'immigrant' ? 55 : 75, fun: 65, social: 55, hygiene: create.bg === 'immigrant' ? 55 : 80 },
+    skills: { ...B.skills }, job: null, jobLevel: 0, jobShifts: 0, weekHours: 0, groceries: create.bg === 'immigrant' ? 2 : 3, outfit: create.bg === 'oldmoney', family: 60,
     visa: create.bg === 'immigrant' ? { type: 'student', expires: 35 } : null,
     rel: { chidi: create.bg === 'immigrant' ? 10 : 0, jade: create.bg === 'newgen' ? 20 : 0, tom: create.bg === 'oldmoney' ? 20 : 0, priya: 0 },
+    traits: (create.traits || []).filter((t) => TRAITS[t]).slice(0, 2), dream: DREAMS[create.dream] ? create.dream : null, visited: [H.area],
     perks: {}, flags: {}, weather: 'grey', strike: false, fares: { tube: 0, bus: 0 }, overdraftWeeks: 0,
     stats: { tubeTrips: 0, busTrips: 0, earned: 0, spent: 0, sentHome: 0, shifts: 0, pints: 0, promotions: 0 },
     log: [], queue: [], cooldown: {}, over: null,
     furniture: Object.fromEntries(START_FURNITURE[create.bg].map((k) => [k, true])), wall: 0,
-    tut: { step: 0 },
+    tut: { step: 0, welcome: true },
   };
   S.weather = rollWeather();
+  const place = `${H.name.toLowerCase()} in ${LOCATIONS[H.area].name}`;
   const intro = {
-    immigrant: `✈️ ${S.name} has landed at Heathrow from ${countryName(S.country)} ${flagOf(S.country)}. £1,200 in the bank, a new visa and two suitcases full of hope. Your room is in Woolwich. The Elizabeth line goes straight there.`,
-    oldmoney: `🎩 ${S.name}${S.country !== 'GB' ? `, from old ${countryName(S.country)} ${flagOf(S.country)} money,` : ''} wakes up in a Chelsea flat Pater pays for. Allowance: £400 a week. Ambition: undecided.`,
-    newgen: `🧢 ${S.name}${S.country !== 'GB' ? `, London-born with ${countryName(S.country)} ${flagOf(S.country)} roots,` : ''} wakes up in the family council flat in Peckham. £300 in the bank, £2,000 owed to QuickCash. Time to get it.`,
+    immigrant: `✈️ ${S.name} has landed in London from ${countryName(S.country)} ${flagOf(S.country)}: a new visa, two suitcases full of hope and a ${place}.`,
+    oldmoney: `🎩 ${S.name}${S.country !== 'GB' ? `, from old ${countryName(S.country)} ${flagOf(S.country)} money,` : ''} wakes up in a ${place} Pater pays for. Allowance: £400 a week. Ambition: undecided.`,
+    newgen: `🧢 ${S.name}${S.country !== 'GB' ? `, London-born with ${countryName(S.country)} ${flagOf(S.country)} roots,` : ''} wakes up in the ${place}. £2,000 owed to QuickCash. Time to get it.`,
   }[S.bg];
   log(intro);
   save();
@@ -1350,7 +1425,7 @@ function newGame() {
   startGame();
 }
 
-// Saves from before the calendar get a start date that keeps their weekdays the same.
+// Older saves get the newer fields with values that keep them playing the same way.
 function migrate(st) {
   if (!st.start) {
     const d = new Date();
@@ -1361,14 +1436,21 @@ function migrate(st) {
   if (!st.furniture) { st.furniture = Object.fromEntries((START_FURNITURE[st.bg] || []).map((k) => [k, true])); st.wall = 0; }
   if (!st.tut) st.tut = { done: true };
   if (!st.country) st.country = st.bg === 'immigrant' ? 'NG' : 'GB'; // saves from before the country picker
+  if (!st.traits) st.traits = [];
+  if (st.dream === undefined) st.dream = null;
+  if (!st.visited) st.visited = [st.home, st.loc];
+  if (!st.homeRent) { st.homeKey = DEFAULT_HOME[st.bg]; st.homeRent = HOMES[st.homeKey].rent; }
+  if (typeof st.look.hair === 'number') st.look = Avatar.normalize(st.look);
   return st;
 }
 
 function startGame() {
   ui.target = null; ui.tab = 'here'; ui.expanded = false;
+  ui.view = S.loc === S.home ? 'room' : 'city';
   showScreen('game');
   World.setAvatar(S.look, S.loc);
   World.focus(S.loc, 62);
+  setView(ui.view);
   if (Online.signedIn()) {
     Online.joinCity(S.loc);
     Online.todaysHeadline().then((h) => { if (h && S) { log(`📰 Today in London: ${h}`); render(); } });
@@ -1382,38 +1464,34 @@ function init() {
   World.init($('#world'), $('#pins'));
   World.onSelect(selectPlace);
   Online.on(LiveUI.handle);
+  Online.on((kind) => { if (kind === 'auth') onAuthChange(); });
   Online.init();
+  Music.init();
   $('#newBtn').onclick = () => {
-    const saved = load();
-    if (!saved || saved.over) return showScreen('create');
-    openModal(`<h2>Start a new life?</h2><p>Your saved game (${esc(saved.name)}, day ${Math.floor(saved.t / 1440) + 1}) will be replaced.</p>
-      <div class="choices"><button class="btn" data-close>Keep my save</button><button class="btn primary" id="confirmNew">Start fresh</button></div>`);
-    $('[data-close]').onclick = closeModal;
-    $('#confirmNew').onclick = () => { clearSave(); closeModal(); showScreen('create'); };
+    if (needsAccount()) { pendingNew = true; return LiveUI.showAuth('signup'); }
+    startNewLife();
   };
   $('#continueBtn').onclick = async () => {
+    if (needsAccount()) return LiveUI.showAuth('login');
     S = load();
     // Signed-in players continue from whichever save is newer: this browser or the cloud.
     if (Online.signedIn()) {
       const cloud = await Online.pullSave();
       if (cloud && !cloud.over && (!S || (cloud.savedAt || 0) > (S.savedAt || 0))) S = cloud;
     }
-    if (!S) return;
+    if (!S || S.over) { S = null; return startNewLife(); }
     migrate(S);
     startGame();
   };
-  $('#startBtn').onclick = newGame;
-  $('#newBtn').disabled = false;
-  $('#backBtn').onclick = showTitle;
   $('#modal').addEventListener('click', (e) => {
     if (e.target.id === 'modal' && (!S || (!S.over && !S.queue.length))) closeModal();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && Home.isOpen() && $('#modal').classList.contains('hidden')) { Home.close(); return; }
     if (e.key === 'Escape' && !$('#modal').classList.contains('hidden') && S && !S.over && !S.queue.length) { closeModal(); processQueue(); }
   });
   Coach.init();
   showTitle();
+  Online.ready.then(() => { titleButtons(); $('#newBtn').disabled = false; });
 }
 
 // js/boot.js calls this once every script has loaded.

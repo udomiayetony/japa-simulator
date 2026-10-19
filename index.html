@@ -17,11 +17,13 @@
 </head>
 <body>
   <div id="world" class="world"></div>
+  <div id="room" class="room hidden"><div class="room-hot" id="roomHot"></div></div>
   <div id="pins" class="pins"></div>
 
   <section id="title" class="screen">
     <header class="topbar">
       <div class="pill brand"><span class="crown">👑</span><b>London Hustle</b><span class="live"><i class="dot"></i>London life sim</span></div>
+      <div class="top-actions"><button class="pill icon music-btn" id="titleMusic" aria-label="Music">🔊</button></div>
     </header>
     <div class="card title-card">
       <h1>Live your London story</h1>
@@ -36,13 +38,17 @@
   </section>
 
   <section id="create" class="screen hidden">
-    <div class="card create-card">
-      <h2>Create your Londoner</h2>
-      <div id="create-body"></div>
-      <div class="row end">
-        <button class="btn white" id="backBtn">Back</button>
-        <button class="btn green big" id="startBtn">Start my London life</button>
-      </div>
+    <div class="onboard">
+      <header class="ob-top">
+        <button class="pill icon" id="obBack" aria-label="Back">‹</button>
+        <div class="ob-progress"><h2 id="obTitle">Look</h2><span class="ob-dots" id="obDots"></span></div>
+        <div class="ob-actions"><button class="pill icon" id="obShuffle" aria-label="Randomise" title="Randomise">🔀</button><button class="btn green" id="obNext">Next</button></div>
+      </header>
+      <div class="ob-stage" id="obStage"><span class="ob-spin">Drag to spin</span></div>
+      <aside class="ob-panel card">
+        <div class="ob-body" id="obBody"></div>
+        <div class="ob-foot"><button class="btn green big" id="obGo">Continue</button></div>
+      </aside>
     </div>
   </section>
 
@@ -52,15 +58,17 @@
       <div class="top-actions" id="topActions"></div>
     </header>
     <div class="chips" id="chips"></div>
+    <div class="tasks" id="tasks"></div>
     <button class="ticker" id="ticker" aria-label="Open your story"></button>
     <div class="bottom">
       <div class="coach" id="coach"></div>
+      <div class="room-bar" id="roomBar"></div>
       <div class="dock" id="dock"></div>
       <section class="sheet card" id="sheet"></section>
+      <nav class="bottom-nav" id="nav" aria-label="Main"></nav>
     </div>
   </section>
 
-  <div id="home" class="home-screen hidden" role="dialog" aria-modal="true" aria-label="Decorate your home"></div>
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div id="modal-card" class="modal-card"></div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

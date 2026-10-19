@@ -54,6 +54,9 @@ const Avatar = (() => {
       eyewear: pickName(look.eyewear, EYEWEAR, 'none'),
       facial: pickName(look.facial, FACIAL, 'none'),
       earrings: pickName(look.earrings, EARRINGS, 'none'),
+      body: pickName(look.body, BODIES, 'man'),
+      style: pickName(look.style, STYLES, 'casual'),
+      fabric: pickName(look.fabric, FABRICS, 'plain'),
     };
   }
 
@@ -262,31 +265,108 @@ const Avatar = (() => {
 
   // ------------------------------------------------------------ body
 
+  // Fabric prints, drawn once per print and colour.
+  const fabricMats = {};
+  function fabricMat(fabric, colour) {
+    if (fabric === 'plain') return phong(colour, 22, 0x222222);
+    const key = fabric + colour;
+    if (!fabricMats[key]) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const g = c.getContext('2d');
+      const base = new THREE.Color(colour);
+      const tone = (f) => '#' + base.clone().multiplyScalar(f).getHexString();
+      g.fillStyle = colour;
+      g.fillRect(0, 0, 128, 128);
+      if (fabric === 'ankara') {
+        // Bold wax-print circles and leaves
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+          const x = i * 32 + (j % 2) * 16 + 8, y = j * 32 + 16;
+          g.fillStyle = '#f2b233'; g.beginPath(); g.arc(x, y, 11, 0, 7); g.fill();
+          g.fillStyle = tone(0.45); g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill();
+          g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(x + 16, y - 14, 5, 2.5, 0.7, 0, 7); g.fill();
+        }
+      } else if (fabric === 'kente') {
+        // Woven blocks of gold, green and red
+        const cols = ['#f2b233', '#1f7a3a', '#c0392b', tone(0.6)];
+        for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) {
+          g.fillStyle = cols[(i + j * 3) % 4];
+          if ((i + j) % 2) g.fillRect(i * 16, j * 16 + 4, 16, 8); else g.fillRect(i * 16 + 4, j * 16, 8, 16);
+        }
+      } else if (fabric === 'tartan') {
+        g.globalAlpha = 0.55;
+        for (const [w, col, off] of [[22, tone(0.45), 0], [8, '#1b2a4a', 40], [3, '#f2d36b', 88], [22, tone(0.45), 64]]) {
+          g.fillStyle = col; g.fillRect(off, 0, w, 128); g.fillRect(0, off, 128, w);
+        }
+        g.globalAlpha = 1;
+      } else if (fabric === 'pinstripe') {
+        g.fillStyle = 'rgba(255,255,255,.55)';
+        for (let x = 4; x < 128; x += 12) g.fillRect(x, 0, 1.5, 128);
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(2, 2);
+      fabricMats[key] = new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.7, sheen: 0.2, sheenRoughness: 0.8, sheenColor: '#ffffff' });
+    }
+    return fabricMats[key];
+  }
+
+  // Body type (woman or man), outfit style (casual, hoodie, office, gym, hi-vis) and fabric.
   function buildBody(L) {
     const g = new THREE.Group();
+    const woman = L.body === 'woman';
+    const colour = OUTFITS[L.outfit];
     const skin = phong(SKIN[L.skin], 16, 0x1e1e1e);
-    const top = phong(OUTFITS[L.outfit], 22, 0x222222);
-    const legsM = phong('#2b3a55', 18, 0x1a1a1a);
-    const shoe = phong('#f4f4f4', 40, 0x444444);
+    const print = fabricMat(L.fabric, colour);
+    const top = L.style === 'office' ? fabricMat(L.fabric, colour) : print;
+    const legsM = phong({ office: '#2f3338', gym: colour, hivis: '#3a3f2e' }[L.style] || '#2b3a55', 18, 0x1a1a1a);
+    const shoe = phong(L.style === 'office' ? '#1c1c1c' : '#f4f4f4', 40, 0x444444);
+    const sw = woman ? 0.88 : 1; // shoulder width
     add(g, new THREE.CylinderGeometry(0.3, 0.34, 0.4, 20), skin, 0, -1.08, -0.05);
-    const torso = new THREE.LatheGeometry([
-      new THREE.Vector2(0, -2.62), new THREE.Vector2(0.92, -2.58), new THREE.Vector2(1.05, -2.25),
-      new THREE.Vector2(1.04, -1.65), new THREE.Vector2(0.92, -1.3), new THREE.Vector2(0.5, -1.16), new THREE.Vector2(0, -1.13),
-    ], 32);
-    add(g, torso, top, 0, 0, -0.05, 1, 1, 0.78);
+    const torso = new THREE.LatheGeometry(woman
+      ? [new THREE.Vector2(0, -2.66), new THREE.Vector2(0.98, -2.6), new THREE.Vector2(0.98, -2.35), new THREE.Vector2(0.8, -1.95),
+        new THREE.Vector2(0.92, -1.6), new THREE.Vector2(0.8, -1.3), new THREE.Vector2(0.45, -1.16), new THREE.Vector2(0, -1.13)]
+      : [new THREE.Vector2(0, -2.62), new THREE.Vector2(0.92, -2.58), new THREE.Vector2(1.05, -2.25),
+        new THREE.Vector2(1.04, -1.65), new THREE.Vector2(0.92, -1.3), new THREE.Vector2(0.5, -1.16), new THREE.Vector2(0, -1.13)], 32);
+    add(g, torso, L.style === 'gym' ? phong(colour, 22, 0x222222) : top, 0, 0, -0.05, 1, 1, 0.78);
+    if (L.style === 'office') {
+      // Shirt and tie under an open jacket
+      add(g, new THREE.CylinderGeometry(0.02, 0.32, 0.9, 3), phong('#f7f7f2', 30), 0, -1.6, 0.7, 1, 1, 0.2).rotation.y = Math.PI;
+      add(g, new THREE.BoxGeometry(0.14, 0.75, 0.06), phong('#9b1c2e', 40), 0, -1.68, 0.76);
+    }
+    if (L.style === 'hoodie') {
+      add(g, new THREE.TorusGeometry(0.42, 0.16, 10, 24), print, 0, -1.22, -0.25, 1, 1, 1).rotation.x = Math.PI / 2.3;
+      add(g, new THREE.BoxGeometry(0.9, 0.36, 0.08), phong(darken(colour, 0.8)), 0, -2.25, 0.74);
+    }
+    if (L.style === 'hivis') {
+      // Fluorescent vest with reflective bands
+      const vest = phong('#d9ff2e', 30, 0, { emissive: '#3d4a00', emissiveIntensity: 0.4 });
+      add(g, torso, vest, 0, 0, -0.05, 1.04, 0.98, 0.82);
+      for (const y of [-1.85, -2.25]) add(g, new THREE.CylinderGeometry(1.07, 1.07, 0.09, 32, 1, true), phong('#d9dde2', 90), 0, y, -0.05, 1, 1, 0.83);
+    }
+    const sleeve = L.style === 'gym' ? null : L.style === 'casual' ? 'short' : 'long';
     // Arms and legs hang from pivots at the shoulder and hip so they can swing when walking.
     for (const s of [-1, 1]) {
       const shoulder = new THREE.Group();
-      shoulder.position.set(s * 1.0, -1.38, -0.05);
+      shoulder.position.set(s * 1.0 * sw, -1.38, -0.05);
       shoulder.rotation.z = s * 0.14;
       shoulder.userData.limb = { kind: 'arm', side: s };
-      add(shoulder, new THREE.CylinderGeometry(0.22, 0.2, 1.15, 16), top, 0, -0.575, 0);
+      const armR = woman ? 0.85 : 1;
+      if (sleeve === 'long') add(shoulder, new THREE.CylinderGeometry(0.22 * armR, 0.2 * armR, 1.15, 16), top, 0, -0.575, 0);
+      else {
+        add(shoulder, new THREE.CylinderGeometry(0.19 * armR, 0.17 * armR, 1.15, 16), skin, 0, -0.575, 0);
+        if (sleeve === 'short') add(shoulder, new THREE.CylinderGeometry(0.24 * armR, 0.23 * armR, 0.45, 16), top, 0, -0.2, 0);
+      }
       add(shoulder, sphere(0.21, 16, 12), skin, 0, -1.22, 0.03);
       g.add(shoulder);
       const hip = new THREE.Group();
-      hip.position.set(s * 0.42, -2.6, -0.05);
+      hip.position.set(s * (woman ? 0.38 : 0.42), -2.6, -0.05);
       hip.userData.limb = { kind: 'leg', side: s };
-      add(hip, new THREE.CylinderGeometry(0.29, 0.26, 1.0, 16), legsM, 0, -0.5, 0);
+      if (L.style === 'gym') {
+        add(hip, new THREE.CylinderGeometry(0.31, 0.29, 0.45, 16), legsM, 0, -0.2, 0);
+        add(hip, new THREE.CylinderGeometry(0.22, 0.2, 0.6, 16), skin, 0, -0.7, 0);
+      } else add(hip, new THREE.CylinderGeometry(0.29, 0.26, 1.0, 16), legsM, 0, -0.5, 0);
       add(hip, sphere(0.3, 16, 12), shoe, 0, -1.02, 0.13, 1.05, 0.62, 1.5);
       g.add(hip);
     }
